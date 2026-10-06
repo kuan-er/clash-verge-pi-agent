@@ -151,7 +151,7 @@ export const LayoutSidebar = (props: LayoutSidebarProps) => {
               color: isDark ? 'white' : 'text.primary',
             }}
           >
-            pash
+            ash
           </Typography>
         </div>
         <UpdateButton className="the-newbtn" />

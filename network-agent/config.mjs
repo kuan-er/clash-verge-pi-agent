@@ -1,10 +1,11 @@
-import { readFile } from 'node:fs/promises'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
-import { resolve } from 'node:path'
+import { dirname, resolve } from 'node:path'
 import { parse } from 'yaml'
 
 export async function loadSettings(envFile) {
   let values = {}
+  let missingFile = false
   try {
     const text = (await readFile(envFile, 'utf8')).trim()
     if (/^sk-[^\s]+$/.test(text)) values.DEEPSEEK_API_KEY = text
@@ -20,10 +21,24 @@ export async function loadSettings(envFile) {
     }
   } catch (error) {
     if (error.code !== 'ENOENT') throw error
+    missingFile = true
   }
-  const apiKey = process.env.DEEPSEEK_API_KEY || values.DEEPSEEK_API_KEY
+  const embeddedKey = globalThis.__pashEmbeddedApiKey || ''
+  const explicitKey = process.env.DEEPSEEK_API_KEY || values.DEEPSEEK_API_KEY
+  const apiKey = explicitKey || embeddedKey
   if (!apiKey)
     throw new Error('Set DEEPSEEK_API_KEY or provide a local .env file.')
+  if (!explicitKey && embeddedKey && missingFile) {
+    await mkdir(dirname(envFile), { recursive: true })
+    try {
+      await writeFile(envFile, `DEEPSEEK_API_KEY=${embeddedKey}\n`, {
+        flag: 'wx',
+        mode: 0o600,
+      })
+    } catch (error) {
+      if (error.code !== 'EEXIST') throw error
+    }
+  }
   const baseUrl =
     process.env.DEEPSEEK_BASE_URL ||
     values.DEEPSEEK_BASE_URL ||

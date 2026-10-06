@@ -27,6 +27,13 @@ another location. Do not put either updater or DeepSeek secrets in source files.
 The release workflow does not include a DeepSeek API key. Packaged apps currently
 read a local `network-agent.env` in their production app-data directory.
 
+For a personal package only, set `PASH_EMBEDDED_API_KEY_FILE` to an existing local
+key file when building. This embeds its key in the worker; it is recoverable from
+the package. Never upload that package to a public release. On first use, when
+the app-data key file is missing, the personal package saves the key there with
+owner-only permissions so subsequent key-free updates continue to work. Existing
+local and environment keys take precedence.
+
 Updater signing does not provide Apple notarization. Without Apple credentials,
 the build uses ad-hoc signing and macOS can require explicit approval to open a
 downloaded app. To distribute a notarized build, configure `APPLE_CERTIFICATE`,
