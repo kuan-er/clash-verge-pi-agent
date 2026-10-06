@@ -1,4 +1,12 @@
-import { DeleteOutlined, ExpandMore, Send, Stop } from '@mui/icons-material'
+import {
+  AddCommentOutlined,
+  ContentCopy,
+  ContentPaste,
+  DeleteOutlined,
+  ExpandMore,
+  Send,
+  Stop,
+} from '@mui/icons-material'
 import {
   Accordion,
   AccordionDetails,
@@ -10,11 +18,13 @@ import {
   Chip,
   CircularProgress,
   IconButton,
+  MenuItem,
   Stack,
   TextField,
   Tooltip,
   Typography,
 } from '@mui/material'
+import { readText, writeText } from '@tauri-apps/plugin-clipboard-manager'
 import { memo, useEffect, useRef, useSyncExternalStore } from 'react'
 import { useTranslation } from 'react-i18next'
 import ReactMarkdown from 'react-markdown'
@@ -24,15 +34,27 @@ import { BasePage } from '@/components/base'
 import {
   applySessionChange,
   clearNetworkConversation,
+  createNetworkConversation,
   getNetworkSession,
   refreshNetworkStatus,
   sendNetworkMessage,
+  selectNetworkConversation,
   setNetworkDraft,
   stopNetworkMessage,
   subscribeNetworkSession,
   undoSessionChange,
   type NetworkMessage,
 } from '@/services/network-agent-session'
+import { showNotice } from '@/services/notice-service'
+
+const copyNetworkText = async (text: string) => {
+  try {
+    await writeText(text)
+    showNotice.success('shared.feedback.notifications.common.copySuccess', 1000)
+  } catch (error) {
+    showNotice.error(error)
+  }
+}
 
 const MessageCard = memo(({ message }: { message: NetworkMessage }) => {
   const { t } = useTranslation()
@@ -41,6 +63,8 @@ const MessageCard = memo(({ message }: { message: NetworkMessage }) => {
       variant="outlined"
       sx={{
         p: 2,
+        userSelect: 'text',
+        WebkitUserSelect: 'text',
         flexShrink: 0,
         ml: message.role === 'user' ? 4 : 0,
         bgcolor: message.role === 'user' ? 'action.hover' : 'background.paper',
@@ -58,12 +82,25 @@ const MessageCard = memo(({ message }: { message: NetworkMessage }) => {
             {t('networkAgent.interrupted')}
           </Typography>
         )}
+        <Box sx={{ flex: 1 }} />
+        <Tooltip title={t('networkAgent.copy')}>
+          <IconButton
+            size="small"
+            aria-label={t('networkAgent.copy')}
+            disabled={!message.text}
+            onClick={() => void copyNetworkText(message.text)}
+          >
+            <ContentCopy fontSize="inherit" />
+          </IconButton>
+        </Tooltip>
       </Stack>
       <Box
         sx={{
           fontSize: 14,
           lineHeight: 1.7,
           overflowWrap: 'anywhere',
+          userSelect: 'text',
+          WebkitUserSelect: 'text',
           '& > :first-of-type': { mt: 0 },
           '& > :last-child': { mb: 0 },
           '& h1': { fontSize: '1.35em' },
@@ -148,20 +185,48 @@ const NetworkAgentPage = () => {
     notice,
     model,
     storageError,
+    conversations,
+    activeConversationId,
+    runningConversationId,
+    requestBusy,
+    loading,
   } = session
   const scrollRef = useRef<HTMLDivElement>(null)
   const followRef = useRef(true)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
 
+  useEffect(() => {
+    followRef.current = true
+  }, [activeConversationId])
   useEffect(() => {
     void refreshNetworkStatus()
   }, [])
   useEffect(() => {
     const element = scrollRef.current
     if (element && followRef.current) element.scrollTop = element.scrollHeight
-  }, [messages, proposals, error, notice])
+  }, [messages, proposals, error, notice, activeConversationId])
   const send = (text: string) => {
     followRef.current = true
     void sendNetworkMessage(text)
+  }
+  const paste = async () => {
+    const targetId = activeConversationId
+    const input = inputRef.current
+    if (!input) return
+    const start = input.selectionStart
+    const end = input.selectionEnd
+    try {
+      const text = await readText()
+      if (!text || getNetworkSession().activeConversationId !== targetId) return
+      const value = getNetworkSession().draft
+      setNetworkDraft(value.slice(0, start) + text + value.slice(end))
+      requestAnimationFrame(() => {
+        input.focus()
+        input.setSelectionRange(start + text.length, start + text.length)
+      })
+    } catch (error) {
+      showNotice.error(error)
+    }
   }
 
   return (
@@ -180,7 +245,8 @@ const NetworkAgentPage = () => {
           <span>
             <IconButton
               size="small"
-              disabled={busy || changing || !messages.length}
+              aria-label={t('networkAgent.clear')}
+              disabled={busy || changing || loading || !messages.length}
               onClick={clearNetworkConversation}
             >
               <DeleteOutlined fontSize="small" />
@@ -205,6 +271,33 @@ const NetworkAgentPage = () => {
           sx={{ alignItems: 'center', flexWrap: 'wrap' }}
         >
           <Chip label={`Pi · ${model}`} color="primary" size="small" />
+          <Button
+            size="small"
+            startIcon={<AddCommentOutlined />}
+            aria-label={t('networkAgent.newConversation')}
+            disabled={changing || loading}
+            onClick={createNetworkConversation}
+          >
+            {t('networkAgent.newConversation')}
+          </Button>
+          <TextField
+            select
+            size="small"
+            value={activeConversationId}
+            label={t('networkAgent.conversations')}
+            disabled={changing || loading}
+            onChange={(event) => selectNetworkConversation(event.target.value)}
+            sx={{ minWidth: 180, flex: 1, maxWidth: 360 }}
+          >
+            {conversations.map((item) => (
+              <MenuItem key={item.id} value={item.id}>
+                {item.title || t('networkAgent.untitled')}
+                {item.id === runningConversationId
+                  ? ` · ${t('networkAgent.inProgress')}`
+                  : ''}
+              </MenuItem>
+            ))}
+          </TextField>
           <Chip
             label={t('networkAgent.terminalEnabled')}
             size="small"
@@ -218,7 +311,7 @@ const NetworkAgentPage = () => {
           )}
           <Button
             size="small"
-            disabled={busy || changing || !status?.undoAvailable}
+            disabled={requestBusy || changing || !status?.undoAvailable}
             onClick={() => void undoSessionChange()}
           >
             {t('networkAgent.undo')}
@@ -244,6 +337,24 @@ const NetworkAgentPage = () => {
         }}
       >
         <Stack spacing={1.5} sx={{ maxWidth: 1000, mx: 'auto' }}>
+          {loading && <CircularProgress size={20} />}
+          {requestBusy && !busy && runningConversationId && (
+            <Alert
+              severity="info"
+              action={
+                <Button
+                  size="small"
+                  onClick={() =>
+                    selectNetworkConversation(runningConversationId)
+                  }
+                >
+                  {t('networkAgent.returnToRunning')}
+                </Button>
+              }
+            >
+              {t('networkAgent.otherConversationRunning')}
+            </Alert>
+          )}
           {!messages.length && (
             <Box sx={{ py: 3 }}>
               <Typography variant="h6" sx={{ mb: 1 }}>
@@ -277,7 +388,7 @@ const NetworkAgentPage = () => {
               </Typography>
               <Button
                 variant="contained"
-                disabled={busy || changing}
+                disabled={requestBusy || changing || loading}
                 onClick={() => void applySessionChange(change)}
               >
                 {t('networkAgent.apply')}
@@ -301,7 +412,7 @@ const NetworkAgentPage = () => {
             <Button
               size="small"
               variant="outlined"
-              disabled={busy || changing}
+              disabled={requestBusy || changing || loading}
               onClick={() => send(t('networkAgent.diagnosisPrompt'))}
             >
               {t('networkAgent.diagnose')}
@@ -309,7 +420,7 @@ const NetworkAgentPage = () => {
             <Button
               size="small"
               variant="outlined"
-              disabled={busy || changing}
+              disabled={requestBusy || changing || loading}
               onClick={() => send(t('networkAgent.configurationPrompt'))}
             >
               {t('networkAgent.configure')}
@@ -317,12 +428,16 @@ const NetworkAgentPage = () => {
           </Stack>
           <Stack direction="row" spacing={1} sx={{ alignItems: 'flex-end' }}>
             <TextField
+              inputRef={inputRef}
               fullWidth
               multiline
               minRows={2}
               maxRows={5}
               value={draft}
-              disabled={changing}
+              disabled={changing || loading}
+              sx={{
+                '& textarea': { userSelect: 'text', WebkitUserSelect: 'text' },
+              }}
               placeholder={t('networkAgent.placeholder')}
               onChange={(event) => setNetworkDraft(event.target.value)}
               onKeyDown={(event) => {
@@ -333,7 +448,7 @@ const NetworkAgentPage = () => {
                   event.nativeEvent.keyCode !== 229
                 ) {
                   event.preventDefault()
-                  if (!busy && !changing) send(draft)
+                  if (!requestBusy && !changing && !loading) send(draft)
                 }
               }}
             />
@@ -341,6 +456,7 @@ const NetworkAgentPage = () => {
               <Button
                 variant="outlined"
                 startIcon={<Stop />}
+                aria-label={t('networkAgent.stop')}
                 sx={{ flexShrink: 0, minWidth: 88, whiteSpace: 'nowrap' }}
                 onClick={() => void stopNetworkMessage()}
               >
@@ -349,8 +465,9 @@ const NetworkAgentPage = () => {
             ) : (
               <Button
                 variant="contained"
-                disabled={!draft.trim() || changing}
+                disabled={!draft.trim() || requestBusy || changing || loading}
                 startIcon={<Send />}
+                aria-label={t('networkAgent.send')}
                 sx={{ flexShrink: 0, minWidth: 88, whiteSpace: 'nowrap' }}
                 onClick={() => send(draft)}
               >
@@ -358,9 +475,41 @@ const NetworkAgentPage = () => {
               </Button>
             )}
           </Stack>
-          <Typography variant="caption" color="text.secondary">
-            {t('networkAgent.inputHint')}
-          </Typography>
+          <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+            <Tooltip title={t('networkAgent.copyInput')}>
+              <span>
+                <IconButton
+                  size="small"
+                  aria-label={t('networkAgent.copyInput')}
+                  disabled={!draft || loading}
+                  onClick={() => {
+                    const input = inputRef.current
+                    const selected = input
+                      ? draft.slice(input.selectionStart, input.selectionEnd)
+                      : ''
+                    void copyNetworkText(selected || draft)
+                  }}
+                >
+                  <ContentCopy fontSize="small" />
+                </IconButton>
+              </span>
+            </Tooltip>
+            <Tooltip title={t('networkAgent.paste')}>
+              <span>
+                <IconButton
+                  size="small"
+                  aria-label={t('networkAgent.paste')}
+                  disabled={changing || loading}
+                  onClick={() => void paste()}
+                >
+                  <ContentPaste fontSize="small" />
+                </IconButton>
+              </span>
+            </Tooltip>
+            <Typography variant="caption" color="text.secondary">
+              {t('networkAgent.inputHint')}
+            </Typography>
+          </Stack>
         </Stack>
       </Box>
     </BasePage>

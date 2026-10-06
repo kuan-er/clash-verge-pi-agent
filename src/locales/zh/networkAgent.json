@@ -28,5 +28,14 @@
     "systemProxy": "系统代理",
     "tun": "TUN 模式",
     "ipv6": "IPv6"
-  }
+  },
+  "newConversation": "新建对话",
+  "conversations": "切换对话",
+  "untitled": "新对话",
+  "inProgress": "执行中",
+  "returnToRunning": "返回执行中的对话",
+  "otherConversationRunning": "另一对话正在执行任务。你可以继续编辑草稿，任务完成后再发送。",
+  "copy": "复制这条消息",
+  "copyInput": "复制输入内容",
+  "paste": "粘贴到输入框"
 }

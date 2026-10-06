@@ -9,7 +9,7 @@ use std::{
 use tauri::Manager as _;
 
 #[cfg(not(feature = "verge-dev"))]
-pub static APP_ID: &str = "io.github.kuan-er.clash-verge-pi-agent";
+pub static APP_ID: &str = "io.github.kuan-er.pash";
 #[cfg(not(feature = "verge-dev"))]
 pub static BACKUP_DIR: &str = "clash-verge-rev-backup";
 

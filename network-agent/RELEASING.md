@@ -1,8 +1,8 @@
 # macOS releases and in-app updates
 
-Pi releases use their own app identity, updater public key and GitHub release
+pash releases use their own app identity, updater public key and GitHub release
 feed. The upstream updater cannot replace this fork. Production app data lives
-under `io.github.kuan-er.clash-verge-pi-agent`; development keeps its existing
+under `io.github.kuan-er.pash`; development keeps its existing
 development data directory. Normal updates replace the app bundle and preserve
 app data and conversations.
 
@@ -42,12 +42,12 @@ secrets. Never regenerate the updater key when adding Apple signing.
 3. Commit and push the version changes, then tag that commit:
 
    ```sh
-   git tag pi-v0.1.1
+   git tag pash-v0.1.1
    git push origin pi-agent
-   git push origin pi-v0.1.1
+   git push origin pash-v0.1.1
    ```
 
-The **Pi macOS Release** workflow builds Apple Silicon and Intel packages, bundles
+The **pash macOS Release** workflow builds Apple Silicon and Intel packages, bundles
 Node.js, signs update archives, and publishes the release only after both builds
 succeed and all assets are uploaded. Its `latest.json` points to immutable
 versioned archives and carries each complete signature. Publishing the release

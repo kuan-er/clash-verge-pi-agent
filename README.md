@@ -1,4 +1,4 @@
-# Clash Verge Pi Agent
+# pash
 
 An experimental fork of [Clash Verge Rev](https://github.com/clash-verge-rev/clash-verge-rev)
 with a Pi-powered network assistant and DeepSeek integration. The assistant

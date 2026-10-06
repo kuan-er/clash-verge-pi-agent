@@ -1,6 +1,6 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "identifier": "io.github.kuan-er.clash-verge-pi-agent",
+  "identifier": "io.github.kuan-er.pash",
   "bundle": {
     "targets": ["nsis"],
     "windows": {

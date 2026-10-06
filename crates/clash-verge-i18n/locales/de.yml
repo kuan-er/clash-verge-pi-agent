@@ -30,7 +30,7 @@ notifications:
     title: Beenden steht bevor
     body: Clash Verge wird gleich beendet.
   updateReady:
-    title: Clash Verge Update
+    title: pash Update
     body: A new version (v{version}) has been downloaded and is ready to install.
     installNow: Install Now
     later: Later

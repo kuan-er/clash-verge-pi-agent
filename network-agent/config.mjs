@@ -59,18 +59,12 @@ export async function installedSnapshot() {
   const root =
     process.env.NETWORK_AGENT_CONFIG_DIR ||
     (process.platform === 'darwin'
-      ? resolve(
-          homedir(),
-          'Library/Application Support/io.github.kuan-er.clash-verge-pi-agent',
-        )
+      ? resolve(homedir(), 'Library/Application Support/io.github.kuan-er.pash')
       : process.platform === 'win32'
-        ? resolve(
-            process.env.APPDATA || homedir(),
-            'io.github.kuan-er.clash-verge-pi-agent',
-          )
+        ? resolve(process.env.APPDATA || homedir(), 'io.github.kuan-er.pash')
         : resolve(
             process.env.XDG_DATA_HOME || resolve(homedir(), '.local/share'),
-            'io.github.kuan-er.clash-verge-pi-agent',
+            'io.github.kuan-er.pash',
           ))
   const read = async (name) => {
     try {

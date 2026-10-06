@@ -26,55 +26,103 @@ export interface NetworkMessage {
   status?: 'running' | 'done' | 'interrupted'
 }
 
-interface SessionState {
+interface Conversation {
+  id: string
+  title: string
+  updatedAt: number
   messages: NetworkMessage[]
   proposals: NetworkChange[]
   draft: string
   model: string
-  busy: boolean
-  changing: boolean
   error: string
-  storageError: boolean
   notice: 'applied' | 'undone' | 'stopped' | ''
+}
+
+interface SessionState extends Conversation {
+  conversations: Pick<Conversation, 'id' | 'title' | 'updatedAt'>[]
+  activeConversationId: string
+  runningConversationId?: string
+  busy: boolean
+  requestBusy: boolean
+  changing: boolean
+  loading: boolean
+  storageError: boolean
   status?: NetworkAgentStatus
 }
 
-const STORAGE_KEY = 'network-agent-conversation-v1'
+const LEGACY_KEY = 'network-agent-conversation-v1'
+const FALLBACK_KEY = 'network-agent-conversations-v2'
 const listeners = new Set<() => void>()
-let state: SessionState = {
+const emptyConversation = (): Conversation => ({
+  id: crypto.randomUUID(),
+  title: '',
+  updatedAt: Date.now(),
   messages: [],
   proposals: [],
   draft: '',
   model: 'DeepSeek',
-  busy: false,
-  changing: false,
   error: '',
-  storageError: false,
   notice: '',
+})
+let conversations = [emptyConversation()]
+let activeConversationId = conversations[0].id
+let activeRequest:
+  | { id: string; conversationId: string; stopped: boolean }
+  | undefined
+let globals: Pick<
+  SessionState,
+  'changing' | 'loading' | 'storageError' | 'status'
+> = {
+  changing: false,
+  loading: true,
+  storageError: false,
 }
-try {
-  const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null')
-  if (saved?.version === 1 && Array.isArray(saved.messages)) {
-    state.messages = saved.messages.map((message: NetworkMessage) => ({
-      ...message,
-      status: message.status === 'running' ? 'interrupted' : message.status,
-      checks: message.checks?.map((check) => ({
-        ...check,
-        isError: check.done ? check.isError : true,
-        done: true,
-      })),
-    }))
-    state.draft = saved.draft || ''
-    state.model = saved.model || 'DeepSeek'
-    state.proposals = saved.proposals || []
-  }
-} catch {
-  state.storageError = true
+let database: IDBDatabase | undefined
+let saveTimer: ReturnType<typeof setTimeout> | undefined
+let migratedLegacy = false
+let migratedFallback = false
+
+function currentConversation() {
+  return conversations.find((item) => item.id === activeConversationId)!
 }
 
-let saveTimer: ReturnType<typeof setTimeout> | undefined
-let activeId: string | undefined
-let stopRequested = false
+function snapshot(): SessionState {
+  return {
+    ...currentConversation(),
+    ...globals,
+    activeConversationId,
+    conversations: conversations.map(({ id, title, updatedAt }) => ({
+      id,
+      title,
+      updatedAt,
+    })),
+    runningConversationId: activeRequest?.conversationId,
+    busy: activeRequest?.conversationId === activeConversationId,
+    requestBusy: Boolean(activeRequest),
+  }
+}
+let state = snapshot()
+
+function notify(persist = true) {
+  state = snapshot()
+  listeners.forEach((listener) => listener())
+  if (persist && !globals.loading) {
+    clearTimeout(saveTimer)
+    saveTimer = setTimeout(() => void save(), 300)
+  }
+}
+
+function updateConversation(id: string, patch: Partial<Conversation>) {
+  conversations = conversations.map((item) =>
+    item.id === id ? { ...item, ...patch, updatedAt: Date.now() } : item,
+  )
+  notify()
+}
+
+function updateGlobals(patch: Partial<typeof globals>) {
+  globals = { ...globals, ...patch }
+  notify(false)
+}
 
 function networkAgentError(error: unknown) {
   if (typeof error === 'object' && error !== null && 'detail' in error)
@@ -82,51 +130,133 @@ function networkAgentError(error: unknown) {
   return error instanceof Error ? error.message : String(error)
 }
 
-function save() {
-  clearTimeout(saveTimer)
+async function hydrate() {
   try {
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({
-        version: 1,
-        messages: state.messages.slice(-80).map((message) => ({
-          ...message,
-          checks: message.checks?.map((check) => {
-            const result = JSON.stringify(check.result)
-            return result?.length > 8192
-              ? { ...check, result: result.slice(0, 8192) + '\n[truncated]' }
-              : check
-          }),
-        })),
-        draft: state.draft,
-        model: state.model,
-        proposals: state.proposals,
-      }),
-    )
+    database = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('pash-network-agent', 1)
+      request.onupgradeneeded = () =>
+        request.result.createObjectStore('workspace')
+      request.onsuccess = () => resolve(request.result)
+      request.onerror = () => reject(request.error)
+    })
   } catch {
-    state = { ...state, storageError: true }
-    listeners.forEach((listener) => listener())
+    globals.storageError = true
+  }
+  try {
+    let saved = database
+      ? await new Promise<any>((resolve, reject) => {
+          const request = database!
+            .transaction('workspace')
+            .objectStore('workspace')
+            .get('conversations')
+          request.onsuccess = () => resolve(request.result)
+          request.onerror = () => reject(request.error)
+        })
+      : JSON.parse(localStorage.getItem(FALLBACK_KEY) || 'null')
+    if (!saved && database) {
+      saved = JSON.parse(localStorage.getItem(FALLBACK_KEY) || 'null')
+      migratedFallback = Boolean(saved)
+    }
+    if (!saved) {
+      const legacy = JSON.parse(localStorage.getItem(LEGACY_KEY) || 'null')
+      if (legacy?.version === 1 && Array.isArray(legacy.messages)) {
+        const first = legacy.messages.find(
+          (item: NetworkMessage) => item.role === 'user' && item.text.trim(),
+        )
+        const conversation = {
+          ...emptyConversation(),
+          ...legacy,
+          title: first?.text.trim().replace(/\s+/g, ' ').slice(0, 40) || '',
+        }
+        saved = {
+          version: 2,
+          conversations: [conversation],
+          activeConversationId: conversation.id,
+        }
+        migratedLegacy = true
+      }
+    }
+    if (
+      saved?.version === 2 &&
+      Array.isArray(saved.conversations) &&
+      saved.conversations.length
+    ) {
+      conversations = saved.conversations.map((item: Conversation) => ({
+        ...emptyConversation(),
+        ...item,
+        error: '',
+        notice: '',
+        messages: item.messages.map((message) => ({
+          ...message,
+          status: message.status === 'running' ? 'interrupted' : message.status,
+          checks: message.checks?.map((check) => ({
+            ...check,
+            isError: check.done ? check.isError : true,
+            done: true,
+          })),
+        })),
+      }))
+      activeConversationId = conversations.some(
+        (item) => item.id === saved.activeConversationId,
+      )
+        ? saved.activeConversationId
+        : conversations[0].id
+    }
+  } catch {
+    globals.storageError = true
+  }
+  updateGlobals({ loading: false })
+  if (migratedLegacy || migratedFallback) void save()
+}
+const ready = hydrate()
+
+async function save() {
+  clearTimeout(saveTimer)
+  await ready
+  const saved = {
+    version: 2,
+    activeConversationId,
+    conversations: conversations.map((conversation) => ({
+      ...conversation,
+      error: '',
+      notice: '',
+      messages: conversation.messages.slice(-80).map((message) => ({
+        ...message,
+        checks: message.checks?.map((check) => {
+          const result = JSON.stringify(check.result)
+          return result?.length > 8192
+            ? { ...check, result: result.slice(0, 8192) + '\n[truncated]' }
+            : check
+        }),
+      })),
+    })),
+  }
+  try {
+    if (database) {
+      await new Promise<void>((resolve, reject) => {
+        const transaction = database!.transaction('workspace', 'readwrite')
+        transaction.objectStore('workspace').put(saved, 'conversations')
+        transaction.oncomplete = () => resolve()
+        transaction.onerror = () => reject(transaction.error)
+        transaction.onabort = () => reject(transaction.error)
+      })
+    } else localStorage.setItem(FALLBACK_KEY, JSON.stringify(saved))
+    if (migratedLegacy) {
+      localStorage.removeItem(LEGACY_KEY)
+      migratedLegacy = false
+    }
+    if (migratedFallback) {
+      localStorage.removeItem(FALLBACK_KEY)
+      migratedFallback = false
+    }
+  } catch {
+    updateGlobals({ storageError: true })
   }
 }
 
-function update(patch: Partial<SessionState>) {
-  state = { ...state, ...patch }
-  listeners.forEach((listener) => listener())
-  clearTimeout(saveTimer)
-  saveTimer = setTimeout(save, 300)
-}
-
-function updateMessage(id: string, patch: Partial<NetworkMessage>) {
-  update({
-    messages: state.messages.map((message) =>
-      message.id === id ? { ...message, ...patch } : message,
-    ),
-  })
-}
-
 window.addEventListener('pagehide', () => {
-  save()
-  if (activeId) void cancelNetworkAgent(activeId)
+  void save()
+  if (activeRequest) void cancelNetworkAgent(activeRequest.id)
 })
 
 export const getNetworkSession = () => state
@@ -136,34 +266,61 @@ export const subscribeNetworkSession = (listener: () => void) => {
     listeners.delete(listener)
   }
 }
-export const setNetworkDraft = (draft: string) => update({ draft })
+export const setNetworkDraft = (draft: string) =>
+  updateConversation(activeConversationId, { draft })
+
+export function createNetworkConversation() {
+  if (globals.loading || globals.changing) return
+  const conversation = emptyConversation()
+  conversations = [conversation, ...conversations]
+  activeConversationId = conversation.id
+  notify()
+}
+
+export function selectNetworkConversation(id: string) {
+  if (
+    globals.loading ||
+    globals.changing ||
+    !conversations.some((item) => item.id === id)
+  )
+    return
+  activeConversationId = id
+  notify()
+}
 
 export async function refreshNetworkStatus() {
   try {
-    update({ status: await networkAgentStatus() })
+    updateGlobals({ status: await networkAgentStatus() })
   } catch (error) {
-    update({ error: networkAgentError(error) })
+    updateConversation(activeConversationId, {
+      error: networkAgentError(error),
+    })
   }
 }
 
 export async function sendNetworkMessage(text: string) {
-  if (state.busy || state.changing || !text.trim()) return
-  const id = crypto.randomUUID()
+  await ready
+  if (activeRequest || globals.changing || !text.trim()) return
+  const conversation = currentConversation()
+  const request = {
+    id: crypto.randomUUID(),
+    conversationId: conversation.id,
+    stopped: false,
+  }
   const assistantId = crypto.randomUUID()
-  const history = state.messages
+  const history = conversation.messages
     .filter((message) => message.text.trim())
     .slice(-24)
     .map(({ role, text }) => ({ role, text: text.slice(-8000) }))
-  activeId = id
-  stopRequested = false
-  update({
-    busy: true,
+  activeRequest = request
+  updateConversation(conversation.id, {
+    title: conversation.title || text.trim().replace(/\s+/g, ' ').slice(0, 40),
     draft: '',
     error: '',
     notice: '',
     proposals: [],
     messages: [
-      ...state.messages,
+      ...conversation.messages,
       { id: crypto.randomUUID(), role: 'user', text },
       {
         id: assistantId,
@@ -174,6 +331,18 @@ export async function sendNetworkMessage(text: string) {
       },
     ],
   })
+  const message = () =>
+    conversations
+      .find((item) => item.id === conversation.id)!
+      .messages.find((item) => item.id === assistantId)!
+  const updateMessage = (patch: Partial<NetworkMessage>) => {
+    const target = conversations.find((item) => item.id === conversation.id)!
+    updateConversation(conversation.id, {
+      messages: target.messages.map((item) =>
+        item.id === assistantId ? { ...item, ...patch } : item,
+      ),
+    })
+  }
   let streamId: string | undefined
   let prefix = ''
   let pendingText = ''
@@ -181,19 +350,18 @@ export async function sendNetworkMessage(text: string) {
   const flush = () => {
     clearTimeout(textTimer)
     textTimer = undefined
-    updateMessage(assistantId, { text: pendingText })
+    updateMessage({ text: pendingText })
   }
   const receive = (event: NetworkAgentEvent) => {
-    if (activeId !== id) return
+    if (activeRequest !== request) return
     if (event.type === 'text') {
       if (streamId && streamId !== event.id) prefix = pendingText
       streamId = event.id
       pendingText = [prefix, event.text].filter(Boolean).join('\n\n')
       textTimer ??= setTimeout(flush, 80)
     } else {
-      const message = state.messages.find((item) => item.id === assistantId)
-      const checks = message?.checks || []
-      updateMessage(assistantId, {
+      const checks = message().checks || []
+      updateMessage({
         checks:
           event.type === 'tool_start'
             ? [
@@ -214,55 +382,69 @@ export async function sendNetworkMessage(text: string) {
     }
   }
   try {
-    const result = await chatWithNetworkAgent(id, text, history, receive)
+    const result = await chatWithNetworkAgent(
+      request.id,
+      text,
+      history,
+      receive,
+    )
     clearTimeout(textTimer)
-    updateMessage(assistantId, {
+    updateMessage({
       text: [prefix, result.text].filter(Boolean).join('\n\n'),
       status: 'done',
     })
-    update({ proposals: result.proposals, model: result.model })
+    updateConversation(conversation.id, {
+      proposals: result.proposals,
+      model: result.model,
+    })
   } catch (error) {
     flush()
-    const message = state.messages.find((item) => item.id === assistantId)
-    updateMessage(assistantId, {
+    updateMessage({
       status: 'interrupted',
-      checks: message?.checks?.map((check) =>
+      checks: message().checks?.map((check) =>
         check.done ? check : { ...check, done: true, isError: true },
       ),
     })
     const detail = networkAgentError(error)
-    update(
-      stopRequested && /cancel|abort/i.test(detail)
+    updateConversation(
+      conversation.id,
+      request.stopped && /cancel|abort/i.test(detail)
         ? { error: '', notice: 'stopped' }
         : { error: detail },
     )
   } finally {
-    activeId = undefined
-    update({ busy: false })
-    save()
+    activeRequest = undefined
+    notify()
+    void save()
   }
 }
 
 export async function stopNetworkMessage() {
-  if (!activeId) return
-  stopRequested = true
+  if (!activeRequest) return
+  const request = activeRequest
+  request.stopped = true
   try {
-    await cancelNetworkAgent(activeId)
+    await cancelNetworkAgent(request.id)
   } catch (error) {
-    update({ error: networkAgentError(error) })
+    updateConversation(request.conversationId, {
+      error: networkAgentError(error),
+    })
   }
 }
 
 export async function applySessionChange(change: NetworkChange) {
-  if (state.busy || state.changing) return
-  update({ changing: true, error: '' })
+  if (activeRequest || globals.changing) return
+  const id = activeConversationId
+  updateGlobals({ changing: true })
+  updateConversation(id, { error: '' })
   try {
     await applyNetworkChange(change)
-    update({
-      proposals: state.proposals.filter((item) => item.id !== change.id),
+    const conversation = conversations.find((item) => item.id === id)!
+    updateConversation(id, {
+      proposals: conversation.proposals.filter((item) => item.id !== change.id),
       notice: 'applied',
       messages: [
-        ...state.messages,
+        ...conversation.messages,
         {
           id: crypto.randomUUID(),
           role: 'user',
@@ -271,23 +453,26 @@ export async function applySessionChange(change: NetworkChange) {
       ],
     })
   } catch (error) {
-    update({ error: networkAgentError(error) })
+    updateConversation(id, { error: networkAgentError(error) })
   } finally {
     await refreshNetworkStatus()
-    update({ changing: false })
+    updateGlobals({ changing: false })
   }
 }
 
 export async function undoSessionChange() {
-  if (state.busy || state.changing) return
-  update({ changing: true, error: '' })
+  if (activeRequest || globals.changing) return
+  const id = activeConversationId
+  updateGlobals({ changing: true })
+  updateConversation(id, { error: '' })
   try {
     await undoNetworkChange()
-    update({
+    const conversation = conversations.find((item) => item.id === id)!
+    updateConversation(id, {
       notice: 'undone',
       proposals: [],
       messages: [
-        ...state.messages,
+        ...conversation.messages,
         {
           id: crypto.randomUUID(),
           role: 'user',
@@ -296,15 +481,27 @@ export async function undoSessionChange() {
       ],
     })
   } catch (error) {
-    update({ error: networkAgentError(error) })
+    updateConversation(id, { error: networkAgentError(error) })
   } finally {
     await refreshNetworkStatus()
-    update({ changing: false })
+    updateGlobals({ changing: false })
   }
 }
 
 export function clearNetworkConversation() {
-  if (state.busy || state.changing) return
-  update({ messages: [], proposals: [], draft: '', error: '', notice: '' })
-  save()
+  if (
+    activeRequest?.conversationId === activeConversationId ||
+    globals.changing ||
+    globals.loading
+  )
+    return
+  updateConversation(activeConversationId, {
+    title: '',
+    messages: [],
+    proposals: [],
+    draft: '',
+    error: '',
+    notice: '',
+  })
+  void save()
 }

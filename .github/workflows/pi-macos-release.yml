@@ -1,8 +1,8 @@
-name: Pi macOS Release
+name: pash macOS Release
 
 on:
   push:
-    tags: ['pi-v*']
+    tags: ['pash-v*']
   workflow_dispatch:
 
 permissions:
@@ -48,7 +48,7 @@ jobs:
           import { readFileSync } from 'node:fs'
           const { version } = JSON.parse(readFileSync('package.json'))
           if (!/^\d+\.\d+\.\d+$/.test(version)) throw new Error('Use a stable semver version.')
-          if (process.env.GITHUB_REF_TYPE === 'tag' && process.env.GITHUB_REF_NAME !== `pi-v${version}`)
+          if (process.env.GITHUB_REF_TYPE === 'tag' && process.env.GITHUB_REF_NAME !== `pash-v${version}`)
             throw new Error('Tag must match package.json version.')
           if (!process.env.TAURI_SIGNING_PRIVATE_KEY) throw new Error('Configure TAURI_SIGNING_PRIVATE_KEY in repository secrets.')
           JS
@@ -60,6 +60,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: pi-macos-${{ matrix.target }}
+          cache-on-failure: true
       - name: Install dependencies and prepare bundled runtimes
         run: |
           pnpm install --frozen-lockfile
@@ -76,7 +77,11 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: pnpm tauri build --target ${{ matrix.target }} --ci
+        run: |
+          for credential_name in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do
+            if [ -z "${!credential_name}" ]; then unset "$credential_name"; fi
+          done
+          pnpm tauri build --target ${{ matrix.target }} --ci
       - name: Collect architecture-specific artifacts
         run: node scripts/pi-release-assets.mjs collect target/${{ matrix.target }}/release/bundle pi-release ${{ matrix.arch }}
       - uses: actions/upload-artifact@v7
@@ -110,7 +115,7 @@ jobs:
           if gh release view "$GITHUB_REF_NAME" --json isDraft --jq .isDraft > /tmp/pi-release-draft; then
             test "$(cat /tmp/pi-release-draft)" = true || { echo 'Published releases are immutable; increment the version.'; exit 1; }
           else
-            gh release create "$GITHUB_REF_NAME" --verify-tag --draft --title "Clash Verge Pi $GITHUB_REF_NAME" --notes-file pi-release/notes.md
+            gh release create "$GITHUB_REF_NAME" --verify-tag --draft --title "pash $GITHUB_REF_NAME" --notes-file pi-release/notes.md
           fi
           gh release upload "$GITHUB_REF_NAME" pi-release/*.dmg pi-release/*.app.tar.gz pi-release/*.sig pi-release/latest.json --clobber
           gh release edit "$GITHUB_REF_NAME" --draft=false --latest

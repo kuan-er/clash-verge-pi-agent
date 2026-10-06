@@ -28,5 +28,14 @@
     "systemProxy": "System proxy",
     "tun": "TUN mode",
     "ipv6": "IPv6"
-  }
+  },
+  "newConversation": "New Chat",
+  "conversations": "Conversations",
+  "untitled": "New conversation",
+  "inProgress": "Running",
+  "returnToRunning": "Return to running chat",
+  "otherConversationRunning": "Another conversation is running. You can edit your draft and send it when the task finishes.",
+  "copy": "Copy message",
+  "copyInput": "Copy input",
+  "paste": "Paste into input"
 }

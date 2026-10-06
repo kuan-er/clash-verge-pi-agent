@@ -270,6 +270,9 @@ export interface TranslationResources {
       clear: string
       configurationPrompt: string
       configure: string
+      conversations: string
+      copy: string
+      copyInput: string
       description: string
       diagnose: string
       diagnosisPrompt: string
@@ -280,9 +283,14 @@ export interface TranslationResources {
         systemProxy: string
         tun: string
       }
+      inProgress: string
       inputHint: string
       interrupted: string
+      newConversation: string
+      otherConversationRunning: string
+      paste: string
       placeholder: string
+      returnToRunning: string
       running: string
       send: string
       stop: string
@@ -292,6 +300,7 @@ export interface TranslationResources {
       title: string
       undo: string
       undone: string
+      untitled: string
       welcome: string
       you: string
     }

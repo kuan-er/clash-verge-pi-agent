@@ -108,12 +108,16 @@ sends, Shift+Enter inserts a new line, and IME composition does not submit a
 message. Old replies are memoized and streamed text updates are coalesced.
 Scrolling upward pauses automatic following until the view returns near the end.
 
-The latest 80 messages, previews and draft are saved in the app's local webview
-storage. Saved evidence is limited to 8 KiB per tool result. Leaving the page
-keeps an active task running. Reloading or restarting restores the conversation
-and marks incomplete replies as interrupted; it does not resume commands. The
-latest 24 messages, up to 8,000 characters each, are supplied as conversation
-context. **Clear conversation** removes the local conversation and draft.
+Each conversation keeps its latest 80 messages, previews and draft in local
+IndexedDB storage. Existing single-conversation history is migrated on first
+load. Saved evidence is limited to 8 KiB per tool result. New conversations start
+with independent context, and switching conversations keeps an active task
+running in its original conversation. Only one terminal-backed task runs at a
+time. Reloading or restarting restores conversations and marks incomplete replies
+as interrupted; it does not resume commands. The current conversation's latest
+24 messages, up to 8,000 characters each, are supplied as context. **Clear
+conversation** clears only the selected conversation. Messages can be selected
+or copied with their clipboard buttons; the composer has copy and paste buttons.
 
 The assistant runs on request rather than as a scheduled background monitor.
 Dedicated previews do not yet cover subscriptions, rules, DNS resolver editing,

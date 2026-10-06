@@ -29,7 +29,7 @@ if (mode === 'collect') {
       )
     await copyFile(
       matches[0],
-      path.join(output, `Clash.Verge.Pi_${version}_${arch}${extension}`),
+      path.join(output, `pash_${version}_${arch}${extension}`),
     )
   }
 } else if (mode === 'manifest') {
@@ -37,7 +37,7 @@ if (mode === 'collect') {
     process.env.GITHUB_REPOSITORY || 'kuan-er/clash-verge-pi-agent'
   const platforms = {}
   for (const architecture of ['aarch64', 'x86_64']) {
-    const name = `Clash.Verge.Pi_${version}_${architecture}.app.tar.gz`
+    const name = `pash_${version}_${architecture}.app.tar.gz`
     if (!(await stat(path.join(input, name))).size)
       throw new Error(`The ${architecture} archive is empty.`)
     const signature = (
@@ -52,7 +52,7 @@ if (mode === 'collect') {
         `The ${architecture} signature must include version ${version}.`,
       )
     platforms[`darwin-${architecture}`] = {
-      url: `https://github.com/${repository}/releases/download/pi-v${version}/${name}`,
+      url: `https://github.com/${repository}/releases/download/pash-v${version}/${name}`,
       signature,
     }
     platforms[`darwin-${architecture}-app`] =

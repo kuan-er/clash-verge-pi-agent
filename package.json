@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "license": "GPL-3.0-only",
   "scripts": {
-    "start": "tauri dev -f verge-dev,dev-sidecar",
+    "start": "tauri dev --config src-tauri/tauri.dev.conf.json -f verge-dev,dev-sidecar",
     "agent:setup": "npm ci --prefix network-agent",
     "agent:build": "npm run build --prefix network-agent",
     "agent:diagnose": "node network-agent/cli.mjs",

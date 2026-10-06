@@ -71,7 +71,7 @@ const localVersionNormalized = normalizeVersion(appVersion)
 
 export const forkReleaseUrl = (version?: string): string =>
   version
-    ? `https://github.com/kuan-er/clash-verge-pi-agent/releases/tag/pi-v${encodeURIComponent(version)}`
+    ? `https://github.com/kuan-er/clash-verge-pi-agent/releases/tag/pash-v${encodeURIComponent(version)}`
     : 'https://github.com/kuan-er/clash-verge-pi-agent/releases'
 
 export const checkUpdateSafe = async (
