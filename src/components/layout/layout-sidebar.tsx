@@ -144,6 +144,7 @@ export const LayoutSidebar = (props: LayoutSidebarProps) => {
             inheritViewBox
           />
           <Typography
+            className="pash-wordmark"
             sx={{
               fontSize: 23,
               fontWeight: 750,
