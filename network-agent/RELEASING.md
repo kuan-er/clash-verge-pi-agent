@@ -59,6 +59,9 @@ without publishing a release, so it can validate the pipeline first.
 
 ## Local build
 
+The macOS packages require macOS 13.5 or newer, matching the bundled Node 24
+[platform requirements](https://github.com/nodejs/node/blob/v24.21.0/BUILDING.md#platform-list).
+
 ```sh
 bash scripts/build-pi-macos.sh
 ```
