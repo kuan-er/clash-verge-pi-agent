@@ -15,7 +15,11 @@ import type { Options as ReactMarkdownOptions } from 'react-markdown'
 
 import { BaseDialog, DialogRef } from '@/components/base'
 import { useUpdate } from '@/hooks/use-update'
-import { restartApp } from '@/services/cmds'
+import {
+  cancelUpdateDownload,
+  installUpdate,
+  restartApp,
+} from '@/services/cmds'
 import { showNotice } from '@/services/notice-service'
 import { useSetUpdateState, useUpdateState } from '@/services/states'
 import { forkReleaseUrl } from '@/services/update'
@@ -271,8 +275,9 @@ export function UpdateViewer({ ref }: { ref?: Ref<DialogRef> }) {
     }
 
     try {
-      await updateInfo.downloadAndInstall(onDownloadEvent)
-      await restartApp()
+      if (await installUpdate(updateInfo.version, onDownloadEvent)) {
+        await restartApp()
+      }
     } catch (err: any) {
       showNotice.error(err)
     } finally {
@@ -333,12 +338,14 @@ export function UpdateViewer({ ref }: { ref?: Ref<DialogRef> }) {
       okBtn={t('settings.modals.update.actions.update')}
       cancelBtn={t('shared.actions.cancel')}
       loading={updateState}
-      disableCancel={updateState}
       onClose={() => {
         if (!updateState) setOpen(false)
       }}
       onCancel={() => {
-        if (!updateState) setOpen(false)
+        if (updateState) {
+          void cancelUpdateDownload().catch(showNotice.error)
+        }
+        setOpen(false)
       }}
       onOk={onUpdate}
     >

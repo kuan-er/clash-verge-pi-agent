@@ -177,7 +177,8 @@ pub async fn network_agent_chat(
 
 #[tauri::command]
 pub async fn network_agent_cancel(id: String) {
-    if let Some(sender) = CANCELLATIONS.lock().await.remove(&id) {
+    let sender = CANCELLATIONS.lock().await.remove(&id);
+    if let Some(sender) = sender {
         let _ = sender.send(());
     }
 }
