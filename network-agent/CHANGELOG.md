@@ -1,3 +1,7 @@
+## Unreleased
+
+- Use the hosted AI service without configuring a personal API key.
+
 ## 0.1.0
 
 - Add a DeepSeek network assistant with terminal commands and cancellable diagnostics.

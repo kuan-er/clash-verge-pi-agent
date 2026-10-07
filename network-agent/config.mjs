@@ -2,8 +2,23 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, resolve } from 'node:path'
 import { parse } from 'yaml'
+import hostedService from './hosted-service.json' with { type: 'json' }
 
-export async function loadSettings(envFile) {
+export function validateApiEndpoint(baseUrl) {
+  const endpoint = new URL(baseUrl)
+  if (
+    endpoint.protocol !== 'https:' ||
+    endpoint.username ||
+    endpoint.password ||
+    endpoint.search ||
+    endpoint.hash
+  )
+    throw new Error(
+      'The AI service requires an HTTPS endpoint without URL credentials, query or fragment.',
+    )
+}
+
+export async function loadSettings(envFile, env = process.env) {
   let values = {}
   let missingFile = false
   try {
@@ -24,10 +39,17 @@ export async function loadSettings(envFile) {
     missingFile = true
   }
   const embeddedKey = globalThis.__pashEmbeddedApiKey || ''
-  const explicitKey = process.env.DEEPSEEK_API_KEY || values.DEEPSEEK_API_KEY
+  const explicitKey = env.DEEPSEEK_API_KEY || values.DEEPSEEK_API_KEY
   const apiKey = explicitKey || embeddedKey
-  if (!apiKey)
-    throw new Error('Set DEEPSEEK_API_KEY or provide a local .env file.')
+  const hostedBaseUrl =
+    env.PASH_AI_BASE_URL ||
+    values.PASH_AI_BASE_URL ||
+    globalThis.__pashHostedBaseUrl ||
+    hostedService.baseUrl
+  if (!apiKey && !hostedBaseUrl)
+    throw new Error(
+      'The pash AI service is not configured. Set PASH_AI_BASE_URL or DEEPSEEK_API_KEY.',
+    )
   if (!explicitKey && embeddedKey && missingFile) {
     await mkdir(dirname(envFile), { recursive: true })
     try {
@@ -39,17 +61,17 @@ export async function loadSettings(envFile) {
       if (error.code !== 'EEXIST') throw error
     }
   }
-  const baseUrl =
-    process.env.DEEPSEEK_BASE_URL ||
-    values.DEEPSEEK_BASE_URL ||
-    'https://api.deepseek.com'
-  if (new URL(baseUrl).protocol !== 'https:')
-    throw new Error('DeepSeek requires an HTTPS API endpoint.')
+  const baseUrl = apiKey
+    ? env.DEEPSEEK_BASE_URL ||
+      values.DEEPSEEK_BASE_URL ||
+      'https://api.deepseek.com'
+    : hostedBaseUrl
+  validateApiEndpoint(baseUrl)
   return {
-    apiKey,
+    // Pi's OpenAI-compatible client requires a nonempty API key even for an anonymous relay.
+    apiKey: apiKey || 'pash-public',
     baseUrl,
-    model:
-      process.env.DEEPSEEK_MODEL || values.DEEPSEEK_MODEL || 'deepseek-flash',
+    model: env.DEEPSEEK_MODEL || values.DEEPSEEK_MODEL || 'deepseek-flash',
   }
 }
 

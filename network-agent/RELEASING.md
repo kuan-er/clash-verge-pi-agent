@@ -24,8 +24,13 @@ without a migration breaks their update path. Configure the repository secret
 The local build script defaults to the sibling file
 `.release-signing/clash-verge-pi-agent.key`. Set `TAURI_SIGNING_PRIVATE_KEY` to use
 another location. Do not put either updater or DeepSeek secrets in source files.
-The release workflow does not include a DeepSeek API key. Packaged apps currently
-read a local `network-agent.env` in their production app-data directory.
+The release workflow does not include a DeepSeek API key. Public packages use
+the HTTPS URL in `network-agent/hosted-service.json` and need no user-supplied
+key. Deploy and verify the [VPS relay](./relay/README.md) before setting that URL
+and publishing; tag builds refuse to publish without it. Existing local
+`network-agent.env` keys in the production app-data directory take precedence
+and continue to call DeepSeek directly. Provider key rotation only requires
+updating the private VPS environment and restarting the relay.
 
 For a personal package only, set `PASH_EMBEDDED_API_KEY_FILE` to an existing local
 key file when building. This embeds its key in the worker; it is recoverable from

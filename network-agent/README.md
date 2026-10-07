@@ -8,26 +8,32 @@ adapter. The default model is `deepseek-flash`, with thinking disabled.
 React sends requests through Tauri IPC. Rust supplies a small settings snapshot
 and launches the bundled Node.js worker over stdin/stdout. Pi calls bounded
 diagnostic tools, streams its progress back to the page, and produces a summary.
-The API key is read inside the worker; it is never supplied to the webview.
+Public builds with a configured service URL use the hosted pash AI relay without
+a user-supplied key. Only the VPS holds the provider key. Existing local keys can
+still be read inside the worker for direct DeepSeek access; they are never
+supplied to the webview.
 
 The diagnostic tools inspect OS proxy settings, DNS, default routes, proxy environment
 variables and the local proxy listener, and compare direct and proxy HTTPS HEAD
 requests. Controller secrets, subscription URLs and node passwords are excluded
 from the settings snapshot. Diagnostic evidence, including network addresses, is
-sent to DeepSeek when the assistant is used. The terminal also supports broader
+sent through the pash VPS to DeepSeek when the hosted assistant is used (directly
+to DeepSeek with a local key). The terminal also supports broader
 commands and user-requested configuration changes; it is not restricted to the
 four app setting previews.
 
 ## Run
 
-Use Rust 1.99, pnpm 12.8.1 and a supported Node release (22.23+ or 24.18+).
+Use Rust 1.99, pnpm 12.9.1 and a supported Node release (22.23+ or 24.18+).
+Configure and verify the [hosted relay](./relay/README.md) to enable the default
+service. For development, `PASH_AI_BASE_URL=https://YOUR_DOMAIN/v1` overrides
+that URL; alternatively, use a local key as described below.
 
 ```sh
 pnpm install --frozen-lockfile
 pnpm agent:setup
 pnpm prebuild
-cp .env.example .env
-# Fill in DEEPSEEK_API_KEY in .env, then:
+# Use the configured hosted service, or provide a local key as described below.
 bash scripts/run-network-assistant.sh
 ```
 

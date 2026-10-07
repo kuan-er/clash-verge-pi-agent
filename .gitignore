@@ -3,6 +3,8 @@ node_modules
 .env.*
 !.env.example
 src-tauri/resources/network-agent.mjs
+network-agent/relay/relay.env
+network-agent/relay/*.sqlite*
 output/playwright/
 .playwright-cli/
 output/network-agent-*.local.*

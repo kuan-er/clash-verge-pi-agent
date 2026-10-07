@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test *.test.mjs",
+    "test": "node --test *.test.mjs relay/*.test.mjs",
     "start": "node cli.mjs",
     "build": "node build.mjs",
     "diagnose": "node cli.mjs"

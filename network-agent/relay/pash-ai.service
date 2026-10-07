@@ -1,0 +1,26 @@
+[Unit]
+Description=pash AI relay
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pash-ai
+Group=pash-ai
+WorkingDirectory=/opt/pash-ai
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+EnvironmentFile=/etc/pash-ai/relay.env
+ExecStart=/usr/bin/env node /opt/pash-ai/server.mjs
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=10
+StateDirectory=pash-ai
+StateDirectoryMode=0700
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target
