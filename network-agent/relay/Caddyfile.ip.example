@@ -1,0 +1,26 @@
+{
+    admin 127.0.0.1:2021
+    storage file_system {
+        root /var/lib/pash-ai-web
+    }
+}
+
+https://203.0.113.10:8443 {
+    tls {
+        issuer acme https://acme-v02.api.letsencrypt.org/directory {
+            profile shortlived
+            disable_tlsalpn_challenge
+        }
+    }
+
+    @api path /healthz /v1/chat/completions
+    handle @api {
+        reverse_proxy 127.0.0.1:8787 {
+            header_up X-Forwarded-For {remote_host}
+            flush_interval -1
+        }
+    }
+    handle {
+        respond "Not found" 404
+    }
+}

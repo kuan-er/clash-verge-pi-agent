@@ -1,0 +1,27 @@
+[Unit]
+Description=pash AI HTTPS endpoint
+After=network-online.target pash-ai.service
+Wants=network-online.target pash-ai.service
+
+[Service]
+Type=notify
+User=pash-web
+Group=pash-web
+ExecStart=/usr/local/bin/pash-caddy run --config /etc/pash-ai/Caddyfile --adapter caddyfile
+ExecReload=/usr/local/bin/pash-caddy reload --config /etc/pash-ai/Caddyfile --adapter caddyfile
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=10
+StateDirectory=pash-ai-web
+StateDirectoryMode=0700
+Environment=HOME=/var/lib/pash-ai-web
+UMask=0077
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

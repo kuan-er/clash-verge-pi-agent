@@ -39,6 +39,8 @@ On a systemd host, create a `pash-ai` system user. Install `server.mjs` and
 from `relay.env.example` in `/etc/pash-ai/relay.env`, owned by root with mode
 `0600`. This is the only provider-key file required. Never commit or upload it
 to GitHub. The service creates `/var/lib/pash-ai/quota.sqlite` privately.
+If Node is installed privately at `/opt/pash-ai/runtime/node`, override the
+service's `ExecStart` with that absolute path in a systemd drop-in.
 
 Point an owned domain at the VPS and allow HTTPS certificate issuance. Add the
 site from `Caddyfile.example` to the existing Caddy configuration, replacing
@@ -56,14 +58,26 @@ systemctl reload caddy
 curl --fail https://YOUR_DOMAIN/healthz
 ```
 
+If no domain is available, Let's Encrypt's `shortlived` profile supports public
+IP certificates. With Caddy 2.11.7, use `Caddyfile.ip.example`, replacing the
+documentation IP with the VPS's public IP. This serves HTTPS on 8443 and proves
+IP control through HTTP on 80; both ports must be reachable. Port 443 remains
+available for an existing proxy service. Caddy stores its ACME state privately
+and renews the roughly six-day certificate automatically. Install the dedicated
+`pash-ai-web.service` with a `pash-web` system user, a root-owned Caddy binary at
+`/usr/local/bin/pash-caddy` and `/etc/pash-ai/Caddyfile` readable by that user.
+Keep `/etc/pash-ai/relay.env` readable only by root. Validate and reload through
+that dedicated service, rather than another Caddy instance.
+
 On an OpenRC/container host, use its native service manager with the same private
-environment, non-root user, persistent state and loopback listener. A domain and
-public HTTPS mapping are still required; an AnyTLS self-signed certificate and
+environment, non-root user, persistent state and loopback listener. A trusted
+certificate for a domain or public IP is required; an AnyTLS self-signed certificate and
 port mapping are not an HTTPS service endpoint.
 
 After a real streamed tool-call test succeeds over public HTTPS, set
-`baseUrl` in `../hosted-service.json` to `https://YOUR_DOMAIN/v1`. Public app
-builds then require no user setup. `PASH_AI_BASE_URL` can override that public
+`baseUrl` in `../hosted-service.json` to `https://YOUR_DOMAIN/v1`, or
+`https://YOUR_IP:8443/v1` for an IP endpoint. Public app builds then require no
+user setup. `PASH_AI_BASE_URL` can override that public
 URL for development/builds, and `network-agent.env` may contain the same setting.
 The URL contains no credential. Existing local DeepSeek keys take precedence
 and continue to call DeepSeek directly.
