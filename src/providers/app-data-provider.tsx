@@ -11,6 +11,7 @@ import { useVerge } from '@/hooks/use-verge'
 import { getProxyView, getRuntimeState, getSystemProxy } from '@/services/cmds'
 import { subscribeVergeEvents } from '@/services/events'
 import { useQuery } from '@/services/query-client'
+import { updateFastestTransit } from '@/services/transit-selection'
 import { resolveDisplayedMixedPort } from '@/utils/mixed-port'
 
 import {
@@ -104,6 +105,21 @@ export const AppDataProvider = ({
   const runningMode = runState?.mode
 
   const refreshProxy = useStableFn(_refetchProxyView)
+
+  useEffect(() => {
+    const check = () => {
+      void updateFastestTransit().then(
+        () => refreshProxy(),
+        (error) => console.warn('[TransitSelection] Probe failed', error),
+      )
+    }
+    const initial = setTimeout(check, 1000)
+    const interval = setInterval(check, 5 * 60 * 1000)
+    return () => {
+      clearTimeout(initial)
+      clearInterval(interval)
+    }
+  }, [refreshProxy])
   const refreshClashConfig = useStableFn(_refetchClashConfig)
   const refreshRules = useStableFn(_refetchRules)
   const refreshSysproxy = useStableFn(_refetchSysproxy)

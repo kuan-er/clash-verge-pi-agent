@@ -2,7 +2,6 @@
 import {
   AccessTimeRounded,
   ArrowDropDown,
-  ChevronRight,
   NetworkCheckRounded,
   WifiOff as SignalError,
   SignalWifi3Bar as SignalGood,
@@ -33,10 +32,10 @@ import {
 import { useLockFn } from 'ahooks'
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useNavigate } from 'react-router'
 
 import { EnhancedCard } from '@/components/home/enhanced-card'
 import type { ProxySortType } from '@/components/proxy/use-filter-sort'
+import { useRuntimeConfig } from '@/hooks/use-clash'
 import { useGroupDelays } from '@/hooks/use-group-delays'
 import { useProfiles } from '@/hooks/use-profiles'
 import { useProxySelection } from '@/hooks/use-proxy-selection'
@@ -48,6 +47,9 @@ import {
   useProxiesData,
 } from '@/providers/app-data-context'
 import delayManager from '@/services/delay'
+import { showNotice } from '@/services/notice-service'
+import { findTransitProbe, type ChainConfig } from '@/services/transit-probe'
+import { updateFastestTransit } from '@/services/transit-selection'
 import {
   findCurrentGroupMember,
   getRecord,
@@ -535,10 +537,10 @@ const PersistentProxySelect = ({
 
 export const CurrentProxyCard = () => {
   const { t } = useTranslation()
-  const navigate = useNavigate()
   const theme = useTheme()
   const { proxyView } = useProxiesData()
   const { clashConfig } = useClashConfigData()
+  const { data: chainConfig } = useRuntimeConfig()
   const { refreshProxy } = useAppRefreshers()
   const { isCoreDataPending } = useCoreDataStatus()
   const { verge } = useVerge()
@@ -777,13 +779,18 @@ export const CurrentProxyCard = () => {
     [handleSelectChange, isDirectMode, selectedGroup, unsortedProxyOptions],
   )
 
-  const goToProxies = useCallback(() => {
-    navigate('/proxies')
-  }, [navigate])
-
   const currentMember = currentOption?.member
   const currentProxy = currentMember ? memberDetails(currentMember) : undefined
   const selectedProxyName = currentMember?.ref.name ?? ''
+
+  const activeChain = useMemo(() => {
+    if (!proxyView) return null
+    return findTransitProbe(chainConfig as ChainConfig | null, proxyView)
+  }, [chainConfig, proxyView])
+
+  const activeTransit = activeChain
+    ? proxyView?.groups.find((group) => group.name === activeChain.group)?.now
+    : undefined
 
   const currentDelay =
     currentMember && selectedGroupName
@@ -909,6 +916,17 @@ export const CurrentProxyCard = () => {
     refreshProxy()
   })
 
+  const handleUpdateTransit = useLockFn(async () => {
+    try {
+      const result = await updateFastestTransit()
+      refreshProxy()
+      showNotice.info(result)
+    } catch (error) {
+      console.error('[TransitSelection] Failed to update transit', error)
+      showNotice.error('Failed to test transit nodes; see logs')
+    }
+  })
+
   const proxyOptions = useMemo(
     () =>
       isDirectMode || openSelect !== 'proxy'
@@ -999,15 +1017,6 @@ export const CurrentProxyCard = () => {
               {getSortIcon()}
             </IconButton>
           </Tooltip>
-          <Button
-            variant="outlined"
-            size="small"
-            onClick={goToProxies}
-            sx={{ borderRadius: 1.5 }}
-            endIcon={<ChevronRight fontSize="small" />}
-          >
-            {t('layout.components.navigation.tabs.proxies')}
-          </Button>
         </Box>
       }
     >
@@ -1015,6 +1024,17 @@ export const CurrentProxyCard = () => {
         <Box sx={{ py: 4, height: 24 }} />
       ) : currentProxy || (!isDirectMode && selectedGroup) ? (
         <Box>
+          <Button
+            fullWidth
+            variant="contained"
+            color="primary"
+            size="large"
+            startIcon={<NetworkCheckRounded />}
+            onClick={handleUpdateTransit}
+            sx={{ mb: 2, fontWeight: 'bold' }}
+          >
+            测速并更新中转
+          </Button>
           <Box
             sx={{
               display: 'flex',
@@ -1057,6 +1077,15 @@ export const CurrentProxyCard = () => {
                     label={t('home.components.currentProxy.labels.directMode')}
                     color="success"
                     sx={{ mr: 0.5 }}
+                  />
+                )}
+                {activeChain && (
+                  <Chip
+                    size="small"
+                    color="info"
+                    variant="outlined"
+                    sx={{ mr: 0.5 }}
+                    label={`transit: ${activeTransit ?? 'unknown'} (${activeChain.candidates.length})`}
                   />
                 )}
                 {currentProxy?.udp && (

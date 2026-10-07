@@ -6,6 +6,7 @@ src-tauri/resources/network-agent.mjs
 output/playwright/
 .playwright-cli/
 output/network-agent-*.local.*
+chain-transit-test.yaml
 .pnpm-store
 .DS_Store
 dist
