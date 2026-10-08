@@ -45,6 +45,23 @@ type meter struct {
 	down atomic.Uint64
 }
 
+type ipMeter struct {
+	meter
+	firstSeen int64
+	lastSeen  atomic.Int64
+}
+
+type ipTotals struct {
+	totals
+	FirstSeen int64 `json:"firstSeen"`
+	LastSeen  int64 `json:"lastSeen"`
+}
+
+type ipState struct {
+	StartedAt int64                          `json:"startedAt"`
+	Users     map[string]map[string]ipTotals `json:"users"`
+}
+
 type session struct {
 	conn  net.Conn
 	user  string
@@ -55,12 +72,18 @@ type session struct {
 type contextKey struct{}
 
 type server struct {
-	mu       sync.Mutex
-	users    map[string]user
-	meters   map[string]*meter
-	sessions map[*session]bool
-	service  atomic.Pointer[anytls.Service]
-	state    string
+	mu         sync.Mutex
+	users      map[string]user
+	meters     map[string]*meter
+	sessions   map[*session]bool
+	service    atomic.Pointer[anytls.Service]
+	state      string
+	sources    map[string]map[string]*ipMeter
+	started    int64
+	ports      map[uint16]bool
+	listenerMu sync.Mutex
+	listener   net.Listener
+	tlsConfig  *tls.Config
 }
 
 type quietLogger struct{}
@@ -143,18 +166,25 @@ func resolvePublic(ctx context.Context, host string, port uint16) (netip.Addr, e
 
 type countedReader struct {
 	io.Reader
-	counter *atomic.Uint64
+	counter       *atomic.Uint64
+	sourceCounter *atomic.Uint64
+	lastSeen      *atomic.Int64
 }
 
 func (r countedReader) Read(p []byte) (int, error) {
 	n, err := r.Reader.Read(p)
 	r.counter.Add(uint64(n))
+	r.sourceCounter.Add(uint64(n))
+	if n > 0 {
+		r.lastSeen.Store(time.Now().Unix())
+	}
 	return n, err
 }
 
 type publicPacket struct {
 	net.PacketConn
-	meter *meter
+	meter  *meter
+	source *ipMeter
 }
 
 func (p publicPacket) WriteTo(b []byte, addr net.Addr) (int, error) {
@@ -169,11 +199,19 @@ func (p publicPacket) WriteTo(b []byte, addr net.Addr) (int, error) {
 	p.SetDeadline(time.Now().Add(90 * time.Second))
 	n, err := p.PacketConn.WriteTo(b, addr)
 	p.meter.up.Add(uint64(n))
+	p.source.up.Add(uint64(n))
+	if n > 0 {
+		p.source.lastSeen.Store(time.Now().Unix())
+	}
 	return n, err
 }
 func (p publicPacket) ReadFrom(b []byte) (int, net.Addr, error) {
 	n, addr, err := p.PacketConn.ReadFrom(b)
 	p.meter.down.Add(uint64(n))
+	p.source.down.Add(uint64(n))
+	if n > 0 {
+		p.source.lastSeen.Store(time.Now().Unix())
+	}
 	return n, addr, err
 }
 
@@ -193,6 +231,15 @@ func (s *server) NewConnectionEx(ctx context.Context, conn net.Conn, source M.So
 	client.user = id
 	client.conn.SetDeadline(time.Time{})
 	m := s.meters[id]
+	if s.sources[id] == nil {
+		s.sources[id] = map[string]*ipMeter{}
+	}
+	ip := s.sources[id][client.ip]
+	if ip == nil {
+		ip = &ipMeter{firstSeen: time.Now().Unix()}
+		s.sources[id][client.ip] = ip
+	}
+	ip.lastSeen.Store(time.Now().Unix())
 	s.mu.Unlock()
 	var remote net.Conn
 	if destination.Fqdn == uot.MagicAddress || destination.Fqdn == uot.LegacyMagicAddress {
@@ -205,7 +252,7 @@ func (s *server) NewConnectionEx(ctx context.Context, conn net.Conn, source M.So
 		if destination.Fqdn == uot.LegacyMagicAddress {
 			version = uot.LegacyVersion
 		}
-		remote = uot.NewServerConn(publicPacket{packet, m}, version)
+		remote = uot.NewServerConn(publicPacket{packet, m, ip}, version)
 	} else {
 		deadline, cancel := context.WithTimeout(ctx, 10*time.Second)
 		ip, err := resolvePublic(deadline, destination.AddrString(), destination.Port)
@@ -231,8 +278,12 @@ func (s *server) NewConnectionEx(ctx context.Context, conn net.Conn, source M.So
 		go func() { io.Copy(remote, conn); remote.Close(); close(finished) }()
 		io.Copy(conn, remote)
 	} else {
-		go func() { io.Copy(remote, countedReader{conn, &m.up}); remote.Close(); close(finished) }()
-		io.Copy(conn, countedReader{remote, &m.down})
+		go func() {
+			io.Copy(remote, countedReader{conn, &m.up, &ip.up, &ip.lastSeen})
+			remote.Close()
+			close(finished)
+		}()
+		io.Copy(conn, countedReader{remote, &m.down, &ip.down, &ip.lastSeen})
 	}
 	conn.Close()
 	remote.Close()
@@ -254,9 +305,17 @@ func (s *server) snapshot() map[string]any {
 				connections++
 			}
 		}
-		users[id] = map[string]any{"upload": m.up.Load(), "download": m.down.Load(), "ips": ips, "connections": connections}
+		users[id] = map[string]any{"upload": m.up.Load(), "download": m.down.Load(), "ips": ips, "connections": connections, "ipTraffic": s.ipTotals(id)}
 	}
-	return map[string]any{"users": users, "onlineIPs": len(allIPs), "timestamp": time.Now().UnixMilli(), "serverNetwork": networkStats(), "inboundIPs": inboundIPs()}
+	return map[string]any{"users": users, "onlineIPs": len(allIPs), "timestamp": time.Now().UnixMilli(), "ipTrackingStarted": s.started, "serverNetwork": networkStats(), "inboundIPs": inboundIPs(s.ports)}
+}
+
+func (s *server) ipTotals(id string) map[string]ipTotals {
+	result := map[string]ipTotals{}
+	for ip, m := range s.sources[id] {
+		result[ip] = ipTotals{totals{m.up.Load(), m.down.Load()}, m.firstSeen, m.lastSeen.Load()}
+	}
+	return result
 }
 
 func networkStats() map[string]uint64 {
@@ -283,9 +342,10 @@ func networkStats() map[string]uint64 {
 	return result
 }
 
-func inboundIPs() map[string]any {
+func inboundIPs(managedPorts map[uint16]bool) map[string]any {
 	ips := make(map[string]int)
 	proxy := make(map[string]int)
+	services := make(map[string]map[string]int)
 	for _, file := range []string{"/proc/net/tcp", "/proc/net/tcp6"} {
 		data, _ := os.ReadFile(file)
 		for _, line := range strings.Split(string(data), "\n")[1:] {
@@ -299,7 +359,7 @@ func inboundIPs() map[string]any {
 				continue
 			}
 			port, _ := strconv.ParseUint(local[1], 16, 16)
-			if port != 443 && port != 4443 && port != 8443 && port != 23522 {
+			if port != 443 && port != 4443 && !managedPorts[uint16(port)] && port != 8443 && port != 23522 {
 				continue
 			}
 			hex := peer[0]
@@ -317,19 +377,34 @@ func inboundIPs() map[string]any {
 				continue
 			}
 			ips[ip]++
-			if port == 443 || port == 4443 {
+			if services[ip] == nil {
+				services[ip] = map[string]int{}
+			}
+			service := "portal"
+			switch {
+			case port == 23522:
+				service = "ssh"
+			case port == 443:
+				service = "legacyProxy"
+			case port == 4443 || managedPorts[uint16(port)]:
+				service = "managedProxy"
+			}
+			services[ip][service]++
+			if port == 443 || port == 4443 || managedPorts[uint16(port)] {
 				proxy[ip]++
 			}
 		}
 	}
-	return map[string]any{"all": ips, "proxy": proxy}
+	return map[string]any{"all": ips, "proxy": proxy, "services": services}
 }
 
 func (s *server) save() error {
 	s.mu.Lock()
 	data := make(map[string]totals)
+	ips := ipState{StartedAt: s.started, Users: map[string]map[string]ipTotals{}}
 	for id, m := range s.meters {
 		data[id] = totals{m.up.Load(), m.down.Load()}
+		ips.Users[id] = s.ipTotals(id)
 	}
 	s.mu.Unlock()
 	encoded, err := json.Marshal(data)
@@ -340,7 +415,66 @@ func (s *server) save() error {
 	if err = os.WriteFile(p+".tmp", encoded, 0600); err != nil {
 		return err
 	}
+	if err = os.Rename(p+".tmp", p); err != nil {
+		return err
+	}
+	encoded, err = json.Marshal(ips)
+	if err != nil {
+		return err
+	}
+	p = filepath.Join(s.state, "node-ip-totals.json")
+	if err = os.WriteFile(p+".tmp", encoded, 0600); err != nil {
+		return err
+	}
 	return os.Rename(p+".tmp", p)
+}
+
+func (s *server) listen(address string) error {
+	s.listenerMu.Lock()
+	defer s.listenerMu.Unlock()
+	listener, err := net.Listen("tcp", address)
+	if err != nil {
+		return err
+	}
+	port := uint16(listener.Addr().(*net.TCPAddr).Port)
+	s.mu.Lock()
+	s.ports[port] = true
+	s.mu.Unlock()
+	previous := s.listener
+	s.listener = listener
+	if previous != nil {
+		previous.Close()
+	}
+	go func() {
+		for {
+			raw, err := listener.Accept()
+			if err != nil {
+				return
+			}
+			go func() {
+				conn := tls.Server(raw, s.tlsConfig)
+				defer conn.Close()
+				conn.SetDeadline(time.Now().Add(12 * time.Second))
+				if conn.Handshake() != nil {
+					return
+				}
+				conn.SetDeadline(time.Now().Add(12 * time.Second))
+				ip, _, _ := net.SplitHostPort(conn.RemoteAddr().String())
+				if address, err := netip.ParseAddr(ip); err == nil {
+					ip = address.Unmap().String()
+				}
+				s.mu.Lock()
+				client := &session{conn: conn, ip: ip, users: s.users}
+				service := s.service.Load()
+				s.sessions[client] = true
+				s.mu.Unlock()
+				defer func() { s.mu.Lock(); delete(s.sessions, client); s.mu.Unlock() }()
+				ctx := context.WithValue(context.Background(), contextKey{}, client)
+				service.NewConnection(ctx, conn, M.SocksaddrFromNet(conn.RemoteAddr()), nil)
+			}()
+		}
+	}()
+	return nil
 }
 
 func main() {
@@ -349,7 +483,7 @@ func main() {
 		log.Fatal("PASH_STATE_DIR required")
 	}
 	os.MkdirAll(state, 0700)
-	s := &server{state: state, users: map[string]user{}, meters: map[string]*meter{}, sessions: map[*session]bool{}}
+	s := &server{state: state, users: map[string]user{}, meters: map[string]*meter{}, sessions: map[*session]bool{}, sources: map[string]map[string]*ipMeter{}, started: time.Now().Unix(), ports: map[uint16]bool{}}
 	if data, err := os.ReadFile(filepath.Join(state, "node-totals.json")); err == nil {
 		stored := map[string]totals{}
 		if json.Unmarshal(data, &stored) != nil {
@@ -360,6 +494,23 @@ func main() {
 			m.up.Store(t.Upload)
 			m.down.Store(t.Download)
 			s.meters[id] = m
+		}
+	}
+	if data, err := os.ReadFile(filepath.Join(state, "node-ip-totals.json")); err == nil {
+		var stored ipState
+		if json.Unmarshal(data, &stored) != nil {
+			log.Fatal("Invalid saved IP counters")
+		}
+		s.started = stored.StartedAt
+		for id, entries := range stored.Users {
+			s.sources[id] = map[string]*ipMeter{}
+			for ip, t := range entries {
+				m := &ipMeter{firstSeen: t.FirstSeen}
+				m.up.Store(t.Upload)
+				m.down.Store(t.Download)
+				m.lastSeen.Store(t.LastSeen)
+				s.sources[id][ip] = m
+			}
 		}
 	}
 	users := []user{}
@@ -379,11 +530,10 @@ func main() {
 	if address == "" {
 		address = ":4443"
 	}
-	listener, err := net.Listen("tcp", address)
-	if err != nil {
+	s.tlsConfig = &tls.Config{Certificates: []tls.Certificate{certificate}, MinVersion: tls.VersionTLS12}
+	if err := s.listen(address); err != nil {
 		log.Fatal(err)
 	}
-	tlsConfig := &tls.Config{Certificates: []tls.Certificate{certificate}, MinVersion: tls.VersionTLS12}
 	socketPath := filepath.Join(state, "node.sock")
 	os.Remove(socketPath)
 	control, err := net.Listen("unix", socketPath)
@@ -408,33 +558,21 @@ func main() {
 		}
 		w.WriteHeader(204)
 	})
-	go (&http.Server{Handler: mux, ReadHeaderTimeout: 5 * time.Second}).Serve(control)
-	go func() {
-		for {
-			raw, err := listener.Accept()
-			if err != nil {
-				return
-			}
-			go func() {
-				conn := tls.Server(raw, tlsConfig)
-				defer conn.Close()
-				conn.SetDeadline(time.Now().Add(12 * time.Second))
-				if conn.Handshake() != nil {
-					return
-				}
-				conn.SetDeadline(time.Now().Add(12 * time.Second))
-				ip, _, _ := net.SplitHostPort(conn.RemoteAddr().String())
-				s.mu.Lock()
-				client := &session{conn: conn, ip: ip, users: s.users}
-				service := s.service.Load()
-				s.sessions[client] = true
-				s.mu.Unlock()
-				defer func() { s.mu.Lock(); delete(s.sessions, client); s.mu.Unlock() }()
-				ctx := context.WithValue(context.Background(), contextKey{}, client)
-				service.NewConnection(ctx, conn, M.SocksaddrFromNet(conn.RemoteAddr()), nil)
-			}()
+	mux.HandleFunc("PUT /listen", func(w http.ResponseWriter, r *http.Request) {
+		var value struct {
+			Address string `json:"address"`
 		}
-	}()
+		if json.NewDecoder(http.MaxBytesReader(w, r.Body, 512)).Decode(&value) != nil {
+			http.Error(w, "invalid listener", 400)
+			return
+		}
+		if err := s.listen(value.Address); err != nil {
+			http.Error(w, "listener unavailable", 409)
+			return
+		}
+		w.WriteHeader(204)
+	})
+	go (&http.Server{Handler: mux, ReadHeaderTimeout: 5 * time.Second}).Serve(control)
 	go func() {
 		for range time.Tick(time.Second) {
 			if err := s.save(); err != nil {
@@ -453,7 +591,9 @@ func main() {
 	done := make(chan os.Signal, 1)
 	signal.Notify(done, syscall.SIGINT, syscall.SIGTERM)
 	<-done
-	listener.Close()
+	s.listenerMu.Lock()
+	s.listener.Close()
+	s.listenerMu.Unlock()
 	control.Close()
 	if err := s.save(); err != nil {
 		log.Print("Unable to save final traffic counters")

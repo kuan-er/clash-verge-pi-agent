@@ -21,6 +21,7 @@ import {
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
+import { IpDetails, mergeHistory } from './ip-details.mjs'
 
 const scrypt = promisify(scryptCallback)
 const directory = dirname(fileURLToPath(import.meta.url))
@@ -50,6 +51,12 @@ CREATE TABLE IF NOT EXISTS events (id INTEGER PRIMARY KEY, at INTEGER NOT NULL, 
 CREATE TABLE IF NOT EXISTS samples (at INTEGER PRIMARY KEY, upload INTEGER NOT NULL, download INTEGER NOT NULL, server_rx INTEGER NOT NULL, server_tx INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);`)
 chmodSync(join(state, 'portal.sqlite'), 0o600)
+const ipDetails = new IpDetails(db)
+const historyPath = join(state, 'node-history.json')
+const nodeHistory = existsSync(historyPath)
+  ? JSON.parse(readFileSync(historyPath, 'utf8'))
+  : null
+const nodeSocket = process.env.PASH_NODE_SOCKET || join(state, 'node.sock')
 
 const now = () => Math.floor(Date.now() / 1000)
 const hash = (value) => createHash('sha256').update(value).digest('hex')
@@ -92,7 +99,7 @@ function nodeRequest(path, method = 'GET', value) {
     const body = value === undefined ? undefined : JSON.stringify(value)
     const request = httpRequest(
       {
-        socketPath: join(state, 'node.sock'),
+        socketPath: nodeSocket,
         path,
         method,
         headers: { 'Content-Type': 'application/json' },
@@ -132,6 +139,11 @@ async function syncUsers() {
     expiresAt: user.expires_at,
   }))
   atomicWrite(join(state, 'node-users.json'), JSON.stringify(users))
+  if (dirname(nodeSocket) !== state)
+    atomicWrite(
+      join(dirname(nodeSocket), 'node-users.json'),
+      JSON.stringify(users),
+    )
   await nodeRequest('/users', 'PUT', users)
   synced = true
 }
@@ -175,7 +187,7 @@ async function collect() {
   if (sampling) return
   sampling = true
   try {
-    const snapshot = await nodeRequest('/metrics')
+    const snapshot = mergeHistory(await nodeRequest('/metrics'), nodeHistory)
     let upload = 0,
       download = 0
     const persist = db.prepare(
@@ -185,6 +197,7 @@ async function collect() {
     try {
       for (const [id, data] of Object.entries(snapshot.users))
         persist.run(data.upload, data.download, id)
+      ipDetails.record(snapshot, new Set(allUsers().map((user) => user.id)))
       const totals = db
         .prepare(
           'SELECT SUM(upload) AS upload,SUM(download) AS download FROM users',
@@ -321,6 +334,8 @@ function expose(user) {
     total: user.upload + user.download,
     onlineIPs: Object.keys(live.ips),
     connections: live.connections,
+    ipTraffic: ipDetails.forUser(user, telemetry),
+    lastIPLocation: user.last_ip ? ipDetails.location(user.last_ip) : null,
     lastLogin: user.last_login,
     lastIP: user.last_ip,
   }
@@ -489,6 +504,7 @@ const server = createServer(async (request, response) => {
           activationUrl:
             'pash://activate?url=' + encodeURIComponent(subscriptionURL(user)),
           release: getRelease(),
+          ipTrackingStarted: telemetry.ipTrackingStarted || null,
           nodeHealthy,
         })
       if (url.pathname === '/api/logout' && request.method === 'POST') {
@@ -590,6 +606,11 @@ const server = createServer(async (request, response) => {
                 )
                 .get().value,
             ),
+            ipTrackingStarted: telemetry.ipTrackingStarted || null,
+            ipDetails: ipDetails.overview(users, telemetry).map((entry) => ({
+              ...entry,
+              isServer: entry.ip === base.hostname,
+            })),
             users,
             samples,
             inboundIPs: telemetry.inboundIPs,

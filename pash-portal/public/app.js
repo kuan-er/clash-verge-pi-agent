@@ -15,6 +15,8 @@ const icons = {
 }
 const brand =
   '<div class="brand"><span class="logo">P</span><span>ash</span></div>'
+const macosOpenCommand =
+  'xattr -dr com.apple.quarantine "/Applications/pash.app"'
 const svg = (name) =>
   `<svg viewBox="0 0 24 24" aria-hidden="true">${icons[name]}</svg>`
 const escape = (value) =>
@@ -94,7 +96,48 @@ function metric(label, value, foot, accent = false) {
   return `<article class="card ${accent ? 'accent' : ''}"><div class="metric-label">${label}</div><div class="metric-number">${escape(pieces[0])}${pieces.length > 1 ? `<small>${escape(pieces.slice(1).join(' '))}</small>` : ''}</div><div class="metric-foot">${escape(foot)}</div></article>`
 }
 function table(users, compact = false) {
-  return `<div class="table-wrap"><table class="table"><thead><tr><th>账户</th><th>状态</th><th>累计流量</th><th>在线 IP</th><th>${compact ? '最近登录' : '到期时间'}</th>${compact ? '' : '<th>操作</th>'}</tr></thead><tbody>${users.map((user) => `<tr><td><div class="account-inline"><span class="avatar">${escape(user.username.slice(0, 1).toUpperCase())}</span>${escape(user.username)}${user.role === 'admin' ? '<span class="chip">管理员</span>' : ''}</div></td><td><span class="badge ${user.active ? '' : 'off'}">${user.active ? '可用' : user.enabled ? '已到期' : '已停用'}</span></td><td>${bytes(user.total)}<div class="metric-foot">↑ ${bytes(user.upload)} · ↓ ${bytes(user.download)}</div></td><td>${user.onlineIPs.length}<div class="metric-foot">${user.onlineIPs.map(escape).join('<br>') || '当前离线'}</div></td><td>${compact ? date(user.lastLogin) : user.expiresAt ? date(user.expiresAt) : '长期有效'}</td>${compact ? '' : `<td><div class="table-actions"><button data-toggle="${user.id}" ${user.id === account.user.id ? 'disabled' : ''}>${user.enabled ? '停用' : '启用'}</button><button data-reset="${user.id}">重置密码</button><button data-expire="${user.id}">到期时间</button></div></td>`}</tr>`).join('')}</tbody></table></div>`
+  return `<div class="table-wrap"><table class="table"><thead><tr><th>账户</th><th>状态</th><th>累计流量</th><th>在线 IP</th><th>${compact ? '最近登录' : '到期时间'}</th>${compact ? '' : '<th>操作</th>'}</tr></thead><tbody>${users
+    .map(
+      (user) =>
+        `<tr><td><div class="account-inline"><span class="avatar">${escape(user.username.slice(0, 1).toUpperCase())}</span>${escape(user.username)}${user.role === 'admin' ? '<span class="chip">管理员</span>' : ''}</div></td><td><span class="badge ${user.active ? '' : 'off'}">${user.active ? '可用' : user.enabled ? '已到期' : '已停用'}</span></td><td>${bytes(user.total)}<div class="metric-foot">↑ ${bytes(user.upload)} · ↓ ${bytes(user.download)}</div></td><td>${user.onlineIPs.length}<div class="metric-foot">${
+          user.onlineIPs
+            .map((ip) => {
+              const entry = user.ipTraffic?.find((row) => row.ip === ip)
+              return `<div class="account-ip"><code>${escape(ip)}</code><div>${escape(locationText(entry?.location))}</div>${entry?.total != null ? `<div>代理用量 ${bytes(entry.total)}</div>` : ''}</div>`
+            })
+            .join('') || '当前离线'
+        }</div></td><td>${compact ? date(user.lastLogin) : user.expiresAt ? date(user.expiresAt) : '长期有效'}</td>${compact ? '' : `<td><div class="table-actions"><button data-toggle="${user.id}" ${user.id === account.user.id ? 'disabled' : ''}>${user.enabled ? '停用' : '启用'}</button><button data-reset="${user.id}">重置密码</button><button data-expire="${user.id}">到期时间</button></div></td>`}</tr>`,
+    )
+    .join('')}</tbody></table></div>`
+}
+function locationText(location) {
+  if (!location || location.status === 'pending') return '正在查询归属地…'
+  if (location.status === 'unknown') return '归属地暂不可用'
+  return (
+    [
+      ...new Set(
+        [location.country, location.region, location.city].filter(Boolean),
+      ),
+    ].join(' · ') || '归属地暂不可用'
+  )
+}
+function ipTable(entries, started, admin = false) {
+  return `<section class="card section"><div class="section-head"><div><h2>${admin ? '来源 IP 明细' : '我的来源 IP'}</h2><p>查看公网来源、地区和代理用量</p></div><span class="chip">${entries.filter((entry) => entry.connections > 0).length} 个在线 · ${entries.length} 条记录</span></div><div class="table-wrap ip-table-wrap" id="source-ip-table"><table class="table ip-table"><thead><tr><th>来源 IP</th><th>地区 / 运营商</th>${admin ? '<th>关联账户</th>' : ''}<th>累计代理流量</th><th>当前代理速率</th><th>当前连接</th><th>最近代理活动</th></tr></thead><tbody>${
+    entries
+      .map(
+        (entry) =>
+          `<tr><td><code>${escape(entry.ip)}</code><div class="ip-status"><span class="badge ${entry.connections ? '' : 'off'}">${entry.connections ? '在线' : '离线'}</span>${entry.isServer ? '<span class="chip">VPS 本机</span>' : ''}</div></td><td><div class="ip-location">${escape(locationText(entry.location))}</div><div class="metric-foot">${escape(entry.location?.isp || entry.location?.org || '')}${entry.location?.asn ? ` · AS${escape(entry.location.asn)}` : ''}</div></td>${admin ? `<td>${entry.accounts?.map(escape).join('、') || '—'}</td>` : ''}<td>${entry.total === null ? '<span class="subtle">未按 IP 计量</span>' : `<strong>${bytes(entry.total)}</strong><div class="metric-foot">↑ ${bytes(entry.upload)} · ↓ ${bytes(entry.download)}</div>`}</td><td>${entry.total === null ? '—' : `${rate(entry.rates.upload + entry.rates.download)}<div class="metric-foot">↑ ${rate(entry.rates.upload)}<br>↓ ${rate(entry.rates.download)}</div>`}</td><td>${entry.connections} 条<div class="metric-foot">${
+            Object.entries(entry.services || {})
+              .map(
+                ([name, count]) =>
+                  `${escape({ managedProxy: '受管代理', legacyProxy: '旧代理', portal: '用户平台', ssh: 'SSH' }[name] || name)} ${count}`,
+              )
+              .join('<br>') || (!admin && entry.connections ? '已认证代理' : '')
+          }</div></td><td>${date(entry.lastSeen)}</td></tr>`,
+      )
+      .join('') ||
+    `<tr><td colspan="${admin ? 7 : 6}" class="empty">还没有来源 IP 记录，使用代理后会自动出现</td></tr>`
+  }</tbody></table></div><p class="meta-note">在线 IP 按公网地址去重，同一路由器下的多个设备可能共用一个 IP。${started ? `IP 流量从 ${date(started)} 开始记录，` : ''}累计流量和速率仅包含受管代理，不含旧入口、网页和 SSH 用量。地区为 IP 数据库估算。</p></section>`
 }
 function chart(samples) {
   const values = samples
@@ -117,17 +160,10 @@ function chart(samples) {
 }
 function dashboard() {
   if (account.user.role !== 'admin')
-    return `<div class="grid">${metric('我的累计流量', bytes(account.user.total), '上传与下载之和', true)}${metric('累计下载', bytes(account.user.download), '从账户启用开始统计')}${metric('累计上传', bytes(account.user.upload), '从账户启用开始统计')}${metric('在线 IP', account.user.onlineIPs.length, '当前已认证的代理连接')}</div><section class="card section"><div class="section-head"><div><h2>你的连接已经准备好</h2><p>美国 VPS 直连 · 个人账户配置</p></div></div><p class="subtle">下载 pash 后，打开软件并使用本账户登录，即可自动配置美国节点。也可以在安装后点击下方按钮。</p><div class="activation"><div><h3>开始使用 pash</h3><p>无需手动填写服务器、端口或代理密码。</p></div><button class="button" data-page="downloads">获取安装包 ↗</button></div></section>`
+    return `<div class="grid">${metric('我的累计流量', bytes(account.user.total), '上传与下载之和', true)}${metric('累计下载', bytes(account.user.download), '从账户启用开始统计')}${metric('累计上传', bytes(account.user.upload), '从账户启用开始统计')}${metric('在线公网 IP', account.user.onlineIPs.length, '当前已认证的代理来源')}</div>${ipTable(account.user.ipTraffic || [], account.ipTrackingStarted)}<section class="card section"><div class="section-head"><div><h2>你的连接已经准备好</h2><p>美国 VPS 直连 · 个人账户配置</p></div></div><p class="subtle">下载 pash 后，打开软件并使用本账户登录，即可自动配置美国节点。也可以在安装后点击下方按钮。</p><div class="activation"><div><h3>开始使用 pash</h3><p>无需手动填写服务器、端口或代理密码。</p></div><button class="button" data-page="downloads">获取安装包 ↗</button></div></section>`
   const d = overview
   if (!d) return '<div class="empty">正在读取服务器数据…</div>'
-  return `<div class="grid">${metric('账户总数', d.accounts, `${d.activeAccounts} 个可用 · ${d.onlineAccounts} 个在线`)}${metric('代理在线 IP', d.proxyOnlineIPs, `${d.managedOnlineIPs} 个受管来源 · ${d.inboundOnlineIPs} 个全部入站来源`)}${metric('受管账户累计流量', bytes(d.managedTraffic.total), '上传 + 下载 · 独立凭据统计', true)}${metric('VPS 当前网络速率', rate(d.rates.received + d.rates.sent), '整台服务器网卡收发速率')}</div><div class="traffic-layout section"><section class="card"><div class="section-head"><div><h2>实时流量</h2><p>受管代理 · 每 3 秒刷新</p></div><span class="chip">LIVE</span></div><div class="rate-row"><div><div class="rate-label"><span class="dot down"></span>下载</div><div class="rate-value">${rate(d.rates.download)}</div></div><div><div class="rate-label"><span class="dot"></span>上传</div><div class="rate-value">${rate(d.rates.upload)}</div></div></div>${chart(d.samples)}</section><section class="card"><div class="section-head"><h2>服务器用量</h2></div><div class="details"><div class="detail-row"><span>账户累计下载</span><strong>${bytes(d.managedTraffic.download)}</strong></div><div class="detail-row"><span>账户累计上传</span><strong>${bytes(d.managedTraffic.upload)}</strong></div><div class="detail-row divider"><span>VPS 网卡累计接收</span><strong>${bytes(d.serverNetwork.received)}</strong></div><div class="detail-row"><span>VPS 网卡累计发送</span><strong>${bytes(d.serverNetwork.sent)}</strong></div><div class="detail-row"><span>VPS 网卡合计</span><strong>${bytes(d.serverNetwork.received + d.serverNetwork.sent)}</strong></div></div><p class="meta-note">网卡累计为本次系统启动以来的读数，包含代理、网页、SSH 等流量。账户用量自 ${date(d.monitorStarted)} 起统计，不含旧入口的历史流量。</p></section></div><section class="card section"><div class="section-head"><div><h2>账户概况</h2><p>用量与当前连接来源</p></div><button class="button light small" data-page="users">管理账户 ↗</button></div>${table(d.users, true)}</section><section class="card section"><div class="section-head"><h2>当前入站来源 IP</h2><span class="chip">${d.inboundOnlineIPs} 个来源</span></div>${
-    Object.entries(d.inboundIPs.all)
-      .map(
-        ([ip, n]) =>
-          `<div class="list-row"><span>${escape(ip)}</span><small>${n} 条连接</small></div>`,
-      )
-      .join('') || '<div class="empty">当前没有入站连接</div>'
-  }<p class="meta-note">统计代理 443 / 4443、用户平台 8443 与 SSH 23522 的已建立连接；同一公网 IP 会合并计数。</p></section>`
+  return `<div class="grid">${metric('账户总数', d.accounts, `${d.activeAccounts} 个可用 · ${d.onlineAccounts} 个在线`)}${metric('代理在线公网 IP', d.proxyOnlineIPs, `${Object.values(d.inboundIPs.proxy).reduce((sum, n) => sum + n, 0)} 条连接 · ${d.managedOnlineIPs} 个已认证来源`)}${metric('受管账户累计流量', bytes(d.managedTraffic.total), '上传 + 下载 · 独立凭据统计', true)}${metric('VPS 当前网络速率', rate(d.rates.received + d.rates.sent), '整台服务器网卡收发速率')}</div><div class="traffic-layout section"><section class="card"><div class="section-head"><div><h2>实时流量</h2><p>受管代理 · 每 3 秒刷新</p></div><span class="chip">LIVE</span></div><div class="rate-row"><div><div class="rate-label"><span class="dot down"></span>下载</div><div class="rate-value">${rate(d.rates.download)}</div></div><div><div class="rate-label"><span class="dot"></span>上传</div><div class="rate-value">${rate(d.rates.upload)}</div></div></div>${chart(d.samples)}</section><section class="card"><div class="section-head"><h2>服务器用量</h2></div><div class="details"><div class="detail-row"><span>账户累计下载</span><strong>${bytes(d.managedTraffic.download)}</strong></div><div class="detail-row"><span>账户累计上传</span><strong>${bytes(d.managedTraffic.upload)}</strong></div><div class="detail-row divider"><span>VPS 网卡累计接收</span><strong>${bytes(d.serverNetwork.received)}</strong></div><div class="detail-row"><span>VPS 网卡累计发送</span><strong>${bytes(d.serverNetwork.sent)}</strong></div><div class="detail-row"><span>VPS 网卡合计</span><strong>${bytes(d.serverNetwork.received + d.serverNetwork.sent)}</strong></div></div><p class="meta-note">网卡累计为本次系统启动以来的读数，包含代理、网页、SSH 等流量。账户用量自 ${date(d.monitorStarted)} 起统计，不含旧入口的历史流量。</p></section></div><section class="card section"><div class="section-head"><div><h2>账户概况</h2><p>用量与当前连接来源</p></div><button class="button light small" data-page="users">管理账户 ↗</button></div>${table(d.users, true)}</section>${ipTable(d.ipDetails || [], d.ipTrackingStarted, true)}`
 }
 function downloads() {
   const release = account.release
@@ -150,16 +186,17 @@ function downloads() {
         platform = `macOS · ${arch === 'aarch64' ? 'ARM64' : 'X86_64'}`,
         requirement = 'macOS 13.5 或更新版本',
       ]) =>
-        `<article class="card download-card"><span class="chip">${platform}</span><h2>${title}</h2><p>适用于${detail}。<br>安装包内置美国服务地址，登录即可自动配置。</p>${release?.assets?.[arch] ? `<a class="button" href="/download/${arch}">下载安装包 ↓</a><p class="meta-note">pash ${escape(release.version)} · ${requirement}</p>` : '<button class="button" disabled>安装包构建中</button>'}</article>`,
+        `<article class="card download-card"><span class="chip">${platform}</span><h2>${title}</h2><p>适用于${detail}。<br>安装包内置美国服务地址，登录即可自动配置。</p>${release?.assets?.[arch] ? `<a class="button" href="/download/${arch}" ${arch.startsWith('windows') ? '' : 'data-macos-download'}>下载安装包 ↓</a><p class="meta-note">pash ${escape(release.version)} · ${requirement}${arch.startsWith('windows') ? '' : '<br>首次打开若被阻止，请按安装提醒执行终端命令。'}</p>` : '<button class="button" disabled>安装包构建中</button>'}</article>`,
     )
     .join(
       '',
-    )}</div><section class="card section"><div class="section-head"><h2>三步，开始连接</h2></div><div class="steps"><div class="step"><div class="step-num">1</div><h3>安装 pash</h3><p>Mac：打开 DMG，拖入 Applications。Windows：打开 EXE，按提示完成安装。</p></div><div class="step"><div class="step-num">2</div><h3>登录或一键配置</h3><p>在 pash 的账户页使用同一用户名和密码登录，或点击下方按钮。</p></div><div class="step"><div class="step-num">3</div><h3>直接连接美国</h3><p>个人代理配置会自动启用，之后软件更新会保留配置。</p></div></div><div class="activation"><div><h3>已经安装了 pash？</h3><p>打开软件并导入你的个人配置，自动启用美国直连。</p></div><a class="button" href="${escape(account.activationUrl)}">打开 pash 并配置 ↗</a></div><p class="meta-note">需要 pash 0.1.3 或更新版本。<a href="${escape(account.subscriptionUrl)}">下载个人 YAML 配置</a>也可用于手动导入。</p></section>`
+    )}</div><section class="card section"><div class="section-head"><h2>macOS 首次打开</h2><span class="chip">仅 Mac 需要</span></div><p class="subtle">先打开 DMG，把 pash 拖入“应用程序”。如果 macOS 提示“Apple 无法验证 pash”或阻止打开，请打开“终端”，粘贴下面的命令并按回车，再重新打开 pash。</p><div class="command-row"><pre class="install-command"><code id="macos-open-command">${escape(macosOpenCommand)}</code></pre><button class="button light small" id="copy-macos-command">复制命令</button></div><p class="meta-note">请先完成安装，确保 pash 位于 /Applications/pash.app；否则会提示找不到文件。</p></section><section class="card section"><div class="section-head"><h2>三步，开始连接</h2></div><div class="steps"><div class="step"><div class="step-num">1</div><h3>安装 pash</h3><p>Mac：打开 DMG，拖入 Applications。Windows：打开 EXE，按提示完成安装。</p></div><div class="step"><div class="step-num">2</div><h3>登录或一键配置</h3><p>在 pash 的账户页使用同一用户名和密码登录，或点击下方按钮。</p></div><div class="step"><div class="step-num">3</div><h3>直接连接美国</h3><p>个人代理配置会自动启用，之后软件更新会保留配置。</p></div></div><div class="activation"><div><h3>已经安装了 pash？</h3><p>打开软件并导入你的个人配置，自动启用美国直连。</p></div><a class="button" href="${escape(account.activationUrl)}">打开 pash 并配置 ↗</a></div><p class="meta-note">需要 pash 0.1.3 或更新版本。<a href="${escape(account.subscriptionUrl)}">下载个人 YAML 配置</a>也可用于手动导入。</p></section>`
 }
 function security() {
   return `<section class="card security-form"><div class="section-head"><div><h2>修改登录密码</h2><p>修改后其他设备的登录状态会失效</p></div></div><form id="password-form"><label class="field">当前密码<input name="currentPassword" type="password" autocomplete="current-password" required></label><label class="field">新密码<input name="password" type="password" autocomplete="new-password" minlength="10" required placeholder="至少 10 个字符"></label><label class="field">确认新密码<input name="confirm" type="password" autocomplete="new-password" minlength="10" required></label><div class="error" id="password-error"></div><button class="button" type="submit">保存新密码</button></form><button class="button light section" data-logout>退出登录</button></section>`
 }
 function render() {
+  const ipScroll = document.querySelector('#source-ip-table')?.scrollLeft || 0
   const admin = account.user.role === 'admin'
   const titles = {
     dashboard: '连接概览',
@@ -178,6 +215,8 @@ function render() {
     : ['dashboard', 'downloads', 'security']
   root.innerHTML = `<div class="shell"><aside class="sidebar">${brand}<div class="nav-label">WORKSPACE</div><nav class="nav">${pages.map((name) => `<button class="${page === name ? 'active' : ''}" data-page="${name}">${svg(name)}${labels[name]}</button>`).join('')}</nav><div class="side-bottom"><div class="person"><span class="avatar">${escape(account.user.username[0].toUpperCase())}</span><div>${escape(account.user.username)}<small>${admin ? '管理员' : '个人账户'}</small></div></div><button class="logout" data-logout>退出登录 ↗</button></div></aside><main class="main"><header class="topbar"><div><h1>${titles[page]}</h1><p class="subtle">${admin ? '管理你的用户与美国 VPS 连接' : '你的个人网络与使用情况'}</p></div><span class="status ${account.nodeHealthy ? '' : 'off'}">${account.nodeHealthy ? '美国节点运行正常' : '节点数据暂不可用'}</span></header><div id="content">${page === 'dashboard' ? dashboard() : page === 'users' ? `<section class="card"><div class="section-head"><div><h2>全部账户</h2><p>${overview?.accounts || 0} 个账户 · 新增、停用与重置登录密码</p></div><button class="button small" id="create-user">＋ 新建账户</button></div>${table(overview?.users || [])}</section>` : page === 'downloads' ? downloads() : security()}</div></main></div>`
   wire()
+  const ipTableElement = document.querySelector('#source-ip-table')
+  if (ipTableElement) ipTableElement.scrollLeft = ipScroll
 }
 function modal(html, callback) {
   const element = document.createElement('div')
@@ -206,7 +245,36 @@ function showCredentials(username, password) {
     },
   )
 }
+async function copyMacosCommand(element) {
+  try {
+    await navigator.clipboard.writeText(macosOpenCommand)
+    toast('命令已复制，粘贴到终端并按回车')
+  } catch {
+    const selection = window.getSelection()
+    const range = document.createRange()
+    range.selectNodeContents(element)
+    selection.removeAllRanges()
+    selection.addRange(range)
+    toast('已选中命令，请按 ⌘C 复制')
+  }
+}
 function wire() {
+  document
+    .querySelector('#copy-macos-command')
+    ?.addEventListener('click', () =>
+      copyMacosCommand(document.querySelector('#macos-open-command')),
+    )
+  document.querySelectorAll('[data-macos-download]').forEach((link) => {
+    link.addEventListener('click', () => {
+      modal(
+        `<h2>macOS 安装提醒</h2><p class="subtle">下载完成后，打开 DMG，把 pash 拖入“应用程序”。如果首次打开提示“Apple 无法验证 pash”，请打开“终端”，粘贴下面的命令并按回车，再重新打开 pash。</p><pre class="install-command"><code data-macos-command>${escape(macosOpenCommand)}</code></pre><p class="meta-note">先确认已安装到 /Applications/pash.app，避免出现“找不到文件”。</p><div class="modal-actions"><button class="button light" data-copy-macos>复制命令</button><button class="button" data-close>知道了</button></div>`,
+        (element) => {
+          element.querySelector('[data-copy-macos]').onclick = () =>
+            copyMacosCommand(element.querySelector('[data-macos-command]'))
+        },
+      )
+    })
+  })
   document.querySelectorAll('[data-page]').forEach(
     (button) =>
       (button.onclick = () => {

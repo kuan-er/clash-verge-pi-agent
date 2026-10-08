@@ -16,6 +16,31 @@ database. Unexpected shutdown can lose the final second. Historical usage from
 the pre-existing proxy cannot be assigned retroactively. The dashboard labels
 managed-account totals separately from system-boot network-interface counters.
 
+Source-IP counters are stored per account and survive reconnects and restarts.
+The dashboard retains offline sources and shows their country, region, city,
+ISP, ASN, current connections, upload/download rates and last proxy activity.
+Public IPs are deduplicated, so several devices behind one router count as one
+source. IP totals start when this feature is enabled; older account totals are
+retained without assigning them to an IP. Legacy-proxy, portal and SSH connections
+show their services but are not included in managed source-IP payload totals.
+
+Geolocation is fetched asynchronously over HTTPS from ipwho.is and cached in
+SQLite for seven days. Failed lookups show an unavailable location and retry
+later. Only public source addresses are sent to the provider. No credentials,
+account names or usage counters are sent. Locations are approximate.
+
+For an upgrade, `PASH_NODE_SOCKET` can point at a successor node's private Unix
+socket. An optional private `node-history.json` in the portal state directory
+holds frozen earlier account and IP counters; these are added to the successor
+counters exactly once on each snapshot. Its shape matches `users` and
+`ipTrackingStarted` in the node metrics. The node's private `PUT /listen` control
+can move its listener without closing accepted connections, supporting a
+drained handover instead of terminating active proxy sessions.
+
+The download page includes a selectable macOS quarantine-removal command and
+a copy button. Clicking either Mac download also opens an installation reminder,
+with instructions to install into Applications before running the command.
+
 The node exposes metrics and account synchronization only over an owner-only
 Unix socket. The portal listens on loopback behind Caddy. Passwords use scrypt;
 sessions use hashed random tokens and secure HttpOnly cookies. The initial

@@ -533,6 +533,51 @@ select:focus-visible {
 .table-wrap {
   overflow: auto;
 }
+.ip-table {
+  min-width: 1030px;
+}
+.ip-table td {
+  vertical-align: top;
+}
+.ip-table code,
+.account-ip code {
+  white-space: nowrap;
+}
+.ip-location {
+  max-width: 220px;
+  white-space: normal;
+}
+.ip-status {
+  display: flex;
+  gap: 6px;
+  margin-top: 9px;
+}
+.account-ip + .account-ip {
+  margin-top: 10px;
+}
+.command-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 20px;
+  padding: 16px;
+  background: #f5f7f6;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.install-command {
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.command-row .button {
+  flex-shrink: 0;
+}
 .table {
   width: 100%;
   border-collapse: collapse;
@@ -783,6 +828,10 @@ select:focus-visible {
   }
 }
 @media (max-width: 720px) {
+  .command-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
   .login {
     display: block;
     padding: 24px;
