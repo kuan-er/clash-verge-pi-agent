@@ -133,12 +133,12 @@ const Layout = () => {
           borderTopRightRadius: '0px',
         }}
         onContextMenu={(e) => {
+          const target = e.target instanceof Element ? e.target : null
           if (
             OS === 'windows' &&
-            !['input', 'textarea'].includes(
-              e.currentTarget.tagName.toLowerCase(),
-            ) &&
-            !e.currentTarget.isContentEditable
+            !target?.closest(
+              'input, textarea, [contenteditable="true"], [data-network-agent-selectable]',
+            )
           ) {
             e.preventDefault()
           }

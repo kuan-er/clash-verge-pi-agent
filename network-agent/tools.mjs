@@ -247,5 +247,74 @@ export function createTools(snapshot, proposals) {
         return result({ ...proposal, status: 'pending_user_approval' })
       },
     },
+    {
+      name: 'propose_proxy_chain',
+      label: 'Proxy chain preview',
+      description:
+        'Create a persistent chain preview using an existing exit node and transit select group from network_status.chain. Sets dialer-proxy on the exit and a /204 URL on the transit selector. Optionally adds and selects the exit in a separate traffic group. Never applies changes. Node credentials stay in the native app.',
+      parameters: Type.Object({
+        exitNode: Type.String({ maxLength: 256 }),
+        transitGroup: Type.String({ maxLength: 256 }),
+        probeUrl: Type.String({ maxLength: 2048 }),
+        trafficGroup: Type.Optional(Type.String({ maxLength: 256 })),
+        reason: Type.String({ maxLength: 1000 }),
+      }),
+      execute: async (_, args) => {
+        const chain = snapshot.chain
+        if (!chain?.version?.profileId)
+          throw new Error('Open a profile in pash before configuring a chain.')
+        if (!chain.nodes.some((node) => node.name === args.exitNode))
+          throw new Error(
+            'Choose an existing exit node from network_status.chain.nodes.',
+          )
+        const transit = chain.groups.find(
+          (group) => group.name === args.transitGroup,
+        )
+        if (
+          transit?.type !== 'select' ||
+          transit.members?.includes(args.exitNode)
+        )
+          throw new Error(
+            'Choose a transit select group that excludes the exit node.',
+          )
+        if (
+          args.trafficGroup &&
+          (args.trafficGroup === args.transitGroup ||
+            !chain.groups.some(
+              (group) =>
+                group.name === args.trafficGroup && group.type === 'select',
+            ))
+        )
+          throw new Error('Choose a separate select group for traffic.')
+        const url = new URL(args.probeUrl)
+        if (
+          !['http:', 'https:'].includes(url.protocol) ||
+          url.username ||
+          url.password ||
+          url.search ||
+          url.hash ||
+          !(
+            url.pathname === '/204' ||
+            (['www.google.com', 'www.gstatic.com'].includes(url.hostname) &&
+              url.pathname === '/generate_204')
+          )
+        )
+          throw new Error('Use a credential-free /204 URL on the exit server.')
+        const proposal = {
+          id: randomUUID(),
+          field: 'chain',
+          before: chain.version,
+          after: {
+            exitNode: args.exitNode,
+            transitGroup: args.transitGroup,
+            probeUrl: url.href,
+            trafficGroup: args.trafficGroup || null,
+          },
+          reason: args.reason,
+        }
+        proposals.push(proposal)
+        return result({ ...proposal, status: 'pending_user_approval' })
+      },
+    },
   ]
 }

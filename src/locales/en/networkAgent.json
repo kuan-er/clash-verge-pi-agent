@@ -1,15 +1,15 @@
 {
   "title": "AI Network Assistant",
   "description": "Describe a network issue. The assistant can execute terminal commands to investigate or fix it and show their results. Conversations and drafts are saved locally; tasks continue when you navigate away.",
-  "welcome": "Check your network with DeepSeek",
+  "welcome": "Check your network with the assistant",
   "terminalEnabled": "Terminal tools enabled",
   "clear": "Clear conversation",
   "interrupted": "Task interrupted",
   "storageError": "The conversation could not be saved locally. Check the application's storage space.",
-  "inputHint": "Enter to send · Shift+Enter for a new line. Diagnostic evidence and command output are sent to DeepSeek.",
+  "inputHint": "Enter to send · Shift+Enter for a new line",
   "diagnose": "Diagnose network",
   "configure": "Review configuration",
-  "diagnosisPrompt": "Diagnose my network. Compare direct and proxy connectivity to api.deepseek.com and www.google.com, inspect proxy, DNS and routes, and explain the evidence. Do not propose changes yet.",
+  "diagnosisPrompt": "Diagnose my network. Compare direct and proxy connectivity to www.google.com and www.bing.com, inspect proxy, DNS and routes, and explain the evidence. Do not propose changes yet.",
   "configurationPrompt": "Inspect my current network and suggest minimal useful configuration changes with previews. Explain the purpose and effect of each change; do not propose enabling TUN without evidence that it is needed.",
   "you": "You",
   "assistant": "Network assistant",
@@ -20,14 +20,15 @@
   "stop": "Stop",
   "stopped": "The task was stopped.",
   "apply": "Apply this change",
-  "undo": "Undo latest Clash setting",
+  "undo": "Undo latest change",
   "applied": "Setting applied. Run another diagnosis to check the result.",
   "undone": "The latest change was undone.",
   "fields": {
     "mode": "Proxy mode",
     "systemProxy": "System proxy",
     "tun": "TUN mode",
-    "ipv6": "IPv6"
+    "ipv6": "IPv6",
+    "chain": "Proxy chain"
   },
   "newConversation": "New Chat",
   "conversations": "Conversations",
@@ -37,5 +38,21 @@
   "otherConversationRunning": "Another conversation is running. You can edit your draft and send it when the task finishes.",
   "copy": "Copy message",
   "copyInput": "Copy input",
-  "paste": "Paste into input"
+  "paste": "Paste into input",
+  "chainConfigure": "Configure proxy chain",
+  "chainPrompt": "Read my current profile nodes and groups and create a proxy-chain preview. Confirm the transit selector, exit node and traffic group. Ask me to choose if multiple exits are plausible. Prefer a /204 probe on the exit server. Use the proxy-chain preview tool instead of editing subscription files with terminal commands.",
+  "chainInternet": "Internet",
+  "chainProbe": "Transit probe URL",
+  "chainTraffic": "Select “{{node}}” in “{{group}}”",
+  "chainPersistence": "Saved as an override for this profile; survives restarts and subscription updates and can be undone.",
+  "composerHint": "Enter to send · Shift+Enter for a new line",
+  "transit": {
+    "missing_url": "Transit group “{{group}}” needs a /204 URL. Configure it in the AI Network Assistant.",
+    "no_chain": "No measurable chain in this profile. Configure transit and exit in the AI Network Assistant.",
+    "unreachable": "No transit node reached the probe URL. Check the /204 service and connectivity.",
+    "changed": "The chain changed during measurement; no selection updated.",
+    "already": "Fastest transit already selected: {{node}}",
+    "selected": "Fastest transit selected: {{node}}",
+    "failed": "Transit measurement failed. Inspect the AI Network Assistant diagnostics."
+  }
 }

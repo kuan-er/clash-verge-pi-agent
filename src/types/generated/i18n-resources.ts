@@ -267,7 +267,14 @@ export interface TranslationResources {
       applied: string
       apply: string
       assistant: string
+      chainConfigure: string
+      chainInternet: string
+      chainPersistence: string
+      chainProbe: string
+      chainPrompt: string
+      chainTraffic: string
       clear: string
+      composerHint: string
       configurationPrompt: string
       configure: string
       conversations: string
@@ -278,6 +285,7 @@ export interface TranslationResources {
       diagnosisPrompt: string
       evidence: string
       fields: {
+        chain: string
         ipv6: string
         mode: string
         systemProxy: string
@@ -298,6 +306,15 @@ export interface TranslationResources {
       storageError: string
       terminalEnabled: string
       title: string
+      transit: {
+        already: string
+        changed: string
+        failed: string
+        missing_url: string
+        no_chain: string
+        selected: string
+        unreachable: string
+      }
       undo: string
       undone: string
       untitled: string

@@ -1,12 +1,34 @@
 import { Channel, invoke } from '@tauri-apps/api/core'
 
-export interface NetworkChange {
+export interface ProxyChainPlan {
+  exitNode: string
+  transitGroup: string
+  probeUrl: string
+  trafficGroup: string | null
+}
+
+interface ChangePreview {
   id: string
-  field: 'mode' | 'systemProxy' | 'tun' | 'ipv6'
-  before: string | boolean
-  after: string | boolean
   reason: string
 }
+
+export type NetworkChange = ChangePreview &
+  (
+    | {
+        field: 'mode' | 'systemProxy' | 'tun' | 'ipv6'
+        before: string | boolean
+        after: string | boolean
+      }
+    | {
+        field: 'chain'
+        before: {
+          profileId: string
+          fingerprint: string
+          plan: ProxyChainPlan | null
+        }
+        after: ProxyChainPlan
+      }
+  )
 
 export interface NetworkAgentResult {
   text: string

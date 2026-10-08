@@ -11,19 +11,31 @@ import {
 import {
   fastestTransit,
   findTransitProbe,
+  transitProbeIssue,
   type ChainConfig,
 } from './transit-probe'
 
-let running: Promise<string> | null = null
+type TransitResult = {
+  code:
+    | 'missing_url'
+    | 'no_chain'
+    | 'unreachable'
+    | 'changed'
+    | 'already'
+    | 'selected'
+  group?: string
+  node?: string
+}
+let running: Promise<TransitResult> | null = null
 
-async function run(): Promise<string> {
+async function run(): Promise<TransitResult> {
   const [config, view, profiles] = await Promise.all([
     getRuntimeConfig(),
     getProxyView(),
     getProfiles(),
   ])
   const probe = findTransitProbe(config as ChainConfig | null, view)
-  if (!probe) return 'No active chain with a transit selector and /204 URL'
+  if (!probe) return transitProbeIssue(config as ChainConfig | null)
 
   const delays = new Map<string, number>()
   for (const name of probe.candidates) {
@@ -35,7 +47,7 @@ async function run(): Promise<string> {
     }
   }
   const winner = fastestTransit(probe.candidates, delays)
-  if (!winner) return 'No reachable transit node'
+  if (!winner) return { code: 'unreachable' }
 
   const [nextConfig, nextView, nextProfiles] = await Promise.all([
     getRuntimeConfig(),
@@ -51,20 +63,20 @@ async function run(): Promise<string> {
     current.url !== probe.url ||
     !current.candidates.includes(winner)
   ) {
-    return 'Chain changed during measurement; no selection updated'
+    return { code: 'changed' }
   }
   if (
     nextView.groups.find((group) => group.name === probe.group)?.now === winner
   )
-    return `Fastest transit already selected: ${winner}`
+    return { code: 'already', node: winner }
 
   await selectNodeForGroup(probe.group, winner)
   await recordSelectedNode(probe.group, winner)
   await syncTrayProxySelection()
-  return `Fastest transit selected: ${winner}`
+  return { code: 'selected', node: winner }
 }
 
-export function updateFastestTransit(): Promise<string> {
+export function updateFastestTransit(): Promise<TransitResult> {
   if (!running) running = run().finally(() => (running = null))
   return running
 }

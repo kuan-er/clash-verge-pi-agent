@@ -1,6 +1,16 @@
 ai.example.com {
-    reverse_proxy 127.0.0.1:8787 {
-        header_up X-Forwarded-For {remote_host}
-        flush_interval -1
+    @probe {
+        path /204
+        method GET HEAD
+    }
+    handle @probe {
+        header Cache-Control no-store
+        respond 204
+    }
+    handle {
+        reverse_proxy 127.0.0.1:8787 {
+            header_up X-Forwarded-For {remote_host}
+            flush_interval -1
+        }
     }
 }

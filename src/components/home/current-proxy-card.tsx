@@ -920,10 +920,10 @@ export const CurrentProxyCard = () => {
     try {
       const result = await updateFastestTransit()
       refreshProxy()
-      showNotice.info(result)
+      showNotice.info(t(`networkAgent.transit.${result.code}`, result))
     } catch (error) {
       console.error('[TransitSelection] Failed to update transit', error)
-      showNotice.error('Failed to test transit nodes; see logs')
+      showNotice.error(t('networkAgent.transit.failed'))
     }
   })
 

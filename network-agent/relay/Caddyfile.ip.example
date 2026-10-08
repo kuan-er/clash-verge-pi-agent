@@ -13,6 +13,15 @@ https://203.0.113.10:8443 {
         }
     }
 
+    @probe {
+        path /204
+        method GET HEAD
+    }
+    handle @probe {
+        header Cache-Control no-store
+        respond 204
+    }
+
     @api path /healthz /v1/chat/completions
     handle @api {
         reverse_proxy 127.0.0.1:8787 {

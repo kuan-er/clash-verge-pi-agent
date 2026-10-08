@@ -2,7 +2,11 @@ import { describe, expect, test } from 'vitest'
 
 import type { ProxyViewV1 } from '@/types/proxy-view'
 
-import { fastestTransit, findTransitProbe } from './transit-probe'
+import {
+  fastestTransit,
+  findTransitProbe,
+  transitProbeIssue,
+} from './transit-probe'
 
 const view = {
   global: { name: 'GLOBAL', type: 'Selector', now: 'DIRECT', members: [] },
@@ -33,6 +37,38 @@ const config = {
 }
 
 describe('transit probe', () => {
+  test('reports the missing URL from the current Hkus profile', () => {
+    expect(
+      transitProbeIssue({
+        proxies: [{ name: 'US-AnyTLS', 'dialer-proxy': '香港入口' }],
+        'proxy-groups': [{ name: '香港入口', type: 'select' }],
+      }),
+    ).toEqual({ code: 'missing_url', group: '香港入口' })
+  })
+
+  test('finds provider-backed exits with a declared dialer override', () => {
+    const providerView = {
+      ...view,
+      records: {
+        exit: {
+          name: 'exit',
+          source: { kind: 'provider', providerName: 'provider' },
+        },
+      },
+    } as unknown as ProxyViewV1
+    expect(
+      findTransitProbe(
+        {
+          ...config,
+          proxies: [],
+          'proxy-providers': {
+            provider: { override: { 'dialer-proxy': 'transit' } },
+          },
+        },
+        providerView,
+      )?.exit,
+    ).toBe('exit')
+  })
   test('finds the chain from the declared dialer-proxy link', () => {
     expect(findTransitProbe(config, view)).toEqual({
       exit: 'exit',

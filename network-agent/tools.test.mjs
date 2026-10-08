@@ -40,6 +40,7 @@ test('configuration tools only produce validated previews', async () => {
       'system_diagnostics',
       'check_connectivity',
       'propose_change',
+      'propose_proxy_chain',
     ],
   )
   const tool = tools.find((entry) => entry.name === 'propose_change')
@@ -55,6 +56,50 @@ test('configuration tools only produce validated previews', async () => {
   assert.throws(() => validateChange({ field: 'secret', after: 'new-secret' }))
   assert.throws(() => validateChange({ field: 'tun', after: 'true' }))
   assert.throws(() => validateChange({ field: 'mode', after: 'invalid' }))
+})
+
+test('chain previews use existing names without mutating the profile', async () => {
+  const snapshot = {
+    chain: {
+      version: { profileId: 'profile', fingerprint: 'version', plan: null },
+      nodes: [{ name: 'exit' }],
+      groups: [
+        { name: 'transit', type: 'select', members: ['hk'] },
+        { name: 'traffic', type: 'select', members: ['hk'] },
+      ],
+    },
+  }
+  const before = JSON.stringify(snapshot)
+  const proposals = []
+  const tool = createTools(snapshot, proposals).find(
+    (entry) => entry.name === 'propose_proxy_chain',
+  )
+  const args = {
+    exitNode: 'exit',
+    transitGroup: 'transit',
+    trafficGroup: 'traffic',
+    probeUrl: 'https://exit.example/204',
+    reason: 'Requested chain.',
+  }
+  await tool.execute('chain', args)
+  assert.equal(proposals[0].field, 'chain')
+  assert.deepEqual(proposals[0].before, snapshot.chain.version)
+  assert.equal(JSON.stringify(snapshot), before)
+  await assert.rejects(
+    tool.execute('bad', { ...args, exitNode: 'invented' }),
+    /existing exit/,
+  )
+  await assert.rejects(
+    tool.execute('bad', {
+      ...args,
+      probeUrl: 'https://user:secret@exit.example/204',
+    }),
+    /credential-free/,
+  )
+  await assert.rejects(
+    tool.execute('bad', { ...args, trafficGroup: 'transit' }),
+    /separate/,
+  )
 })
 
 test('connectivity checks reject shell fragments and arbitrary URL paths', async () => {

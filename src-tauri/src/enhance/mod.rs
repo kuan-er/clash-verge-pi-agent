@@ -963,7 +963,10 @@ pub async fn enhance(
     let config = authoritative.enforce(config);
     let config = ensure_lan_bind_address(config);
 
-    let config = cleanup_proxy_groups(config);
+    let mut config = cleanup_proxy_groups(config);
+    if let Some(plan) = crate::config::agent_chain::read_plans().await?.get(profile_uid) {
+        crate::config::agent_chain::apply_plan(&mut config, plan)?;
+    }
     let config = use_sort(config);
 
     let mut exists_keys_set = HashSet::new();

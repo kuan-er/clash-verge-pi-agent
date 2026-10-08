@@ -1,6 +1,10 @@
 use super::{CmdResult, StringifyErr as _};
 use crate::{
-    config::{Config, IVerge},
+    config::{
+        Config, IVerge,
+        agent_chain::{self, ChainPlan},
+    },
+    core::{CoreManager, handle::Handle},
     utils::dirs,
 };
 use serde::{Deserialize, Serialize};
@@ -25,6 +29,14 @@ pub struct AgentChange {
     pub field: String,
     pub before: Value,
     pub after: Value,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub selection: Option<ChainSelection>,
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+pub struct ChainSelection {
+    pub group: String,
+    pub node: String,
 }
 
 async fn snapshot() -> CmdResult<Value> {
@@ -33,6 +45,14 @@ async fn snapshot() -> CmdResult<Value> {
     let config = &clash.0;
     let runtime = Config::runtime().await.latest_arc();
     let dns = runtime.config.as_ref().and_then(|mapping| mapping.get("dns"));
+    let profile_id = Config::profiles().await.data_arc().current.clone().unwrap_or_default();
+    let plans = agent_chain::read_plans().await.stringify_err()?;
+    let chain = runtime
+        .config
+        .as_ref()
+        .map(|config| agent_chain::safe_state(config, &profile_id, plans.get(profile_id.as_str())))
+        .transpose()
+        .stringify_err()?;
     Ok(json!({
         "source": "native_app_settings",
         "mode": clash.get_mode().unwrap_or_else(|| "rule".into()),
@@ -42,6 +62,7 @@ async fn snapshot() -> CmdResult<Value> {
         "socksPort": config.get("socks-port").and_then(|v| v.as_u64()).unwrap_or(0),
         "systemProxy": verge.enable_system_proxy.unwrap_or(false),
         "tun": verge.enable_tun_mode.unwrap_or(false),
+        "chain": chain,
         "dns": {
             "enable": dns.and_then(|v| v.get("enable")).and_then(|v| v.as_bool()),
             "enhancedMode": dns.and_then(|v| v.get("enhanced-mode")).and_then(|v| v.as_str()),
@@ -218,6 +239,55 @@ async fn apply_change(change: &AgentChange) -> CmdResult {
 #[tauri::command]
 pub async fn network_agent_apply(change: AgentChange) -> CmdResult<Value> {
     let _guard = CONFIG_LOCK.lock().await;
+    if change.field == "chain" {
+        let _profile_guard = crate::config::profiles::PROFILE_WRITE_LOCK.lock().await;
+        let state = snapshot().await?;
+        if state["chain"]["version"] != change.before {
+            return Err("The profile changed since this preview. Generate a new chain preview.".into());
+        }
+        let plan: ChainPlan = serde_json::from_value(change.after.clone()).stringify_err()?;
+        let mut candidate = Config::runtime()
+            .await
+            .latest_arc()
+            .config
+            .clone()
+            .ok_or("Core configuration is unavailable.")?;
+        agent_chain::apply_plan(&mut candidate, &plan).stringify_err()?;
+        let view = super::get_proxy_view().await?;
+        let previous_selection = plan.traffic_group.as_ref().and_then(|group| {
+            view.groups
+                .iter()
+                .find(|item| item.name.as_str() == group)
+                .and_then(|item| item.now.as_ref())
+                .map(|node| ChainSelection {
+                    group: group.clone(),
+                    node: node.to_string(),
+                })
+        });
+        let inverse = AgentChange {
+            field: "chain".into(),
+            before: json!({ "profileId": change.before["profileId"], "plan": plan }),
+            after: change.before["plan"].clone(),
+            selection: previous_selection,
+        };
+        let backup = dirs::app_home_dir().stringify_err()?.join("network-agent-undo.json");
+        tokio::fs::write(&backup, serde_json::to_vec(&inverse).stringify_err()?)
+            .await
+            .stringify_err()?;
+        apply_chain(&change.before["profileId"], Some(plan.clone())).await?;
+        if let Some(group) = plan.traffic_group {
+            select_chain_node(&group, &plan.exit_node).await?;
+        }
+        let current = snapshot().await?;
+        let inverse = AgentChange {
+            before: current["chain"]["version"].clone(),
+            ..inverse
+        };
+        tokio::fs::write(backup, serde_json::to_vec(&inverse).stringify_err()?)
+            .await
+            .stringify_err()?;
+        return Ok(current);
+    }
     let valid = match change.field.as_str() {
         "mode" => change
             .after
@@ -238,6 +308,7 @@ pub async fn network_agent_apply(change: AgentChange) -> CmdResult<Value> {
         field: change.field.clone(),
         before: change.after.clone(),
         after: change.before.clone(),
+        selection: None,
     };
     tokio::fs::write(&backup, serde_json::to_vec(&inverse).stringify_err()?)
         .await
@@ -255,6 +326,33 @@ pub async fn network_agent_undo() -> CmdResult<Value> {
     let _guard = CONFIG_LOCK.lock().await;
     let path = dirs::app_home_dir().stringify_err()?.join("network-agent-undo.json");
     let change: AgentChange = serde_json::from_slice(&tokio::fs::read(&path).await.stringify_err()?).stringify_err()?;
+    if change.field == "chain" {
+        let _profile_guard = crate::config::profiles::PROFILE_WRITE_LOCK.lock().await;
+        let current = snapshot().await?;
+        if current["chain"]["version"]["profileId"] == change.before["profileId"]
+            && current["chain"]["version"]["plan"] == change.after
+        {
+            if let Some(selection) = change.selection {
+                select_chain_node(&selection.group, &selection.node).await?;
+            }
+            tokio::fs::remove_file(path).await.stringify_err()?;
+            return snapshot().await;
+        }
+        if current["chain"]["version"]["profileId"] != change.before["profileId"]
+            || current["chain"]["version"]["plan"] != change.before["plan"]
+            || (change.before.get("fingerprint").is_some()
+                && current["chain"]["version"]["fingerprint"] != change.before["fingerprint"])
+        {
+            return Err("The chain or profile changed again. Undo would overwrite a newer change.".into());
+        }
+        let plan = serde_json::from_value::<Option<ChainPlan>>(change.after).stringify_err()?;
+        apply_chain(&change.before["profileId"], plan).await?;
+        if let Some(selection) = change.selection {
+            select_chain_node(&selection.group, &selection.node).await?;
+        }
+        tokio::fs::remove_file(path).await.stringify_err()?;
+        return snapshot().await;
+    }
     let current = snapshot().await?;
     if current.get(&change.field) == Some(&change.after) {
         tokio::fs::remove_file(path).await.stringify_err()?;
@@ -266,6 +364,49 @@ pub async fn network_agent_undo() -> CmdResult<Value> {
     apply_change(&change).await?;
     tokio::fs::remove_file(path).await.stringify_err()?;
     snapshot().await
+}
+
+async fn select_chain_node(group: &str, node: &str) -> CmdResult {
+    Handle::mihomo()
+        .select_node_for_group(group, node)
+        .await
+        .stringify_err()?;
+    crate::config::profiles::record_selected_node(group, node)
+        .await
+        .stringify_err()?;
+    Handle::refresh_clash();
+    Handle::refresh_profiles();
+    super::sync_tray_proxy_selection().await
+}
+
+async fn apply_chain(profile_id: &Value, plan: Option<ChainPlan>) -> CmdResult {
+    let profile_id = profile_id.as_str().ok_or("Missing profile ID.")?;
+    if Config::profiles().await.data_arc().current.as_deref() != Some(profile_id) {
+        return Err("Switch back to the profile used for this preview.".into());
+    }
+    if let Some(plan) = &plan {
+        let runtime = Config::runtime().await.latest_arc();
+        let mut candidate = runtime.config.clone().ok_or("Core configuration is unavailable.")?;
+        agent_chain::apply_plan(&mut candidate, plan).stringify_err()?;
+    }
+    let original = agent_chain::read_plans().await.stringify_err()?;
+    let mut next = original.clone();
+    match plan {
+        Some(plan) => {
+            next.insert(profile_id.into(), plan);
+        }
+        None => {
+            next.remove(profile_id);
+        }
+    }
+    agent_chain::save_plans(&next).await.stringify_err()?;
+    if let Err(error) = CoreManager::global().update_config_checked().await {
+        agent_chain::save_plans(&original).await.stringify_err()?;
+        CoreManager::global().update_config_checked().await.stringify_err()?;
+        return Err(format!("Chain activation failed and the previous configuration was restored: {error}").into());
+    }
+    Handle::refresh_clash();
+    Ok(())
 }
 
 #[tauri::command]

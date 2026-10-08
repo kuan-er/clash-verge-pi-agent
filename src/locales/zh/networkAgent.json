@@ -1,15 +1,15 @@
 {
   "title": "AI 网络助手",
   "description": "描述你的网络问题，助手可执行终端命令检查或修复，并展示命令与结果。对话和草稿保存在本地，切换页面后任务继续执行。",
-  "welcome": "让 DeepSeek 帮你检查网络",
+  "welcome": "让网络助手帮你检查网络",
   "terminalEnabled": "终端工具已启用",
   "clear": "清空对话",
   "interrupted": "任务已中断",
   "storageError": "对话暂时无法保存到本地，请检查应用存储空间。",
-  "inputHint": "Enter 发送 · Shift+Enter 换行。诊断证据和命令输出会发送给 DeepSeek。",
+  "inputHint": "Enter 发送 · Shift+Enter 换行",
   "diagnose": "一键诊断网络",
   "configure": "检查配置建议",
-  "diagnosisPrompt": "诊断我的网络。对比 api.deepseek.com 和 www.google.com 的直连与代理连通性，检查系统代理、DNS 和路由，给出有证据的结论。暂不提出配置修改。",
+  "diagnosisPrompt": "诊断我的网络。对比 www.google.com 和 www.bing.com 的直连与代理连通性，检查系统代理、DNS 和路由，给出有证据的结论。暂不提出配置修改。",
   "configurationPrompt": "检查我的当前网络配置，提出有实际帮助的最小配置修改并生成预览。说明每项修改的用途和影响；没有必要性的证据时不要建议开启 TUN。",
   "you": "你",
   "assistant": "网络助手",
@@ -20,14 +20,15 @@
   "stop": "停止",
   "stopped": "已停止本次任务。",
   "apply": "应用这项修改",
-  "undo": "撤销最近一次 Clash 设置",
+  "undo": "撤销最近一次修改",
   "applied": "配置已应用，请再次诊断以检查效果。",
   "undone": "已撤销最近一次修改。",
   "fields": {
     "mode": "代理模式",
     "systemProxy": "系统代理",
     "tun": "TUN 模式",
-    "ipv6": "IPv6"
+    "ipv6": "IPv6",
+    "chain": "链式代理"
   },
   "newConversation": "新建对话",
   "conversations": "切换对话",
@@ -37,5 +38,21 @@
   "otherConversationRunning": "另一对话正在执行任务。你可以继续编辑草稿，任务完成后再发送。",
   "copy": "复制这条消息",
   "copyInput": "复制输入内容",
-  "paste": "粘贴到输入框"
+  "paste": "粘贴到输入框",
+  "chainConfigure": "配置链式代理",
+  "chainPrompt": "读取当前订阅的节点和代理组，帮我配置链式代理并生成预览。先确认中转组、出口节点和承载流量的代理组；如果存在多个可选出口，请让我选择。中转组优先使用出口机器上的 /204 地址测速。不要用终端修改订阅文件，使用链式代理预览工具。",
+  "chainInternet": "互联网",
+  "chainProbe": "中转测速地址",
+  "chainTraffic": "将“{{group}}”切换到“{{node}}”",
+  "chainPersistence": "保存到当前订阅的独立覆盖配置，重启和更新订阅后仍生效，可撤销。",
+  "composerHint": "Enter 发送 · Shift+Enter 换行",
+  "transit": {
+    "missing_url": "中转组“{{group}}”缺少 /204 测速地址，请在 AI 网络助手中配置链式代理。",
+    "no_chain": "当前订阅没有可测速的链式代理，请在 AI 网络助手中配置中转组和出口节点。",
+    "unreachable": "中转节点无法访问测速地址，请检查 /204 服务和中转连通性。",
+    "changed": "测速期间链路配置发生变化，未切换中转节点。",
+    "already": "最快中转已选中：{{node}}",
+    "selected": "已切换到最快中转：{{node}}",
+    "failed": "中转测速失败，请检查网络助手中的诊断结果。"
+  }
 }

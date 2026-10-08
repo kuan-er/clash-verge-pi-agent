@@ -1,3 +1,4 @@
+pub(crate) mod agent_chain;
 mod clash;
 #[allow(clippy::module_inception)]
 mod config;
