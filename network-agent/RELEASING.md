@@ -60,8 +60,8 @@ secrets. Never regenerate the updater key when adding Apple signing.
    ```
 
 The **pash Desktop Release** workflow builds Apple Silicon, Intel Mac and Windows
-x86_64 packages, bundles Node.js, signs update artifacts, and publishes only after all builds
-succeed and all assets are uploaded. Its `latest.json` points to immutable
+x86_64 packages, bundles Node.js, signs update artifacts, and publishes only after
+all builds succeed and all assets are uploaded. Its `latest.json` points to immutable
 versioned archives and carries each complete signature. Publishing the release
 makes the update visible to clients; a Git commit alone does not.
 
