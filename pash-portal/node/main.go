@@ -220,6 +220,12 @@ func (s *server) NewConnectionEx(ctx context.Context, conn net.Conn, source M.So
 		}
 	}
 	defer remote.Close()
+	// AnyTLS v2 clients require SYNACK before their stream timeout.
+	if handshake, ok := conn.(interface{ HandshakeSuccess() error }); ok {
+		if handshake.HandshakeSuccess() != nil {
+			return
+		}
+	}
 	finished := make(chan struct{})
 	if destination.Fqdn == uot.MagicAddress || destination.Fqdn == uot.LegacyMagicAddress {
 		go func() { io.Copy(remote, conn); remote.Close(); close(finished) }()
