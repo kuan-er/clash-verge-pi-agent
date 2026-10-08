@@ -65,7 +65,7 @@ async function api(path, method = 'GET', body) {
   return data
 }
 function renderLogin() {
-  root.innerHTML = `<main class="login"><section class="intro">${brand}<div class="orbit"></div><div class="intro-copy"><div class="eyebrow">YOUR NETWORK, SIMPLIFIED</div><h1>连接世界，<br>从这里开始。</h1><p>为你准备好的美国直连网络。<br>下载 pash，登录账户，让连接与配置变得简单。</p></div><footer>pash 用户中心 · 美国直连</footer></section><section class="login-area"><div class="login-form"><div class="mobile-brand">${brand}</div><div class="eyebrow">WELCOME BACK</div><h2>登录你的账户</h2><p class="subtle">管理连接、查看用量，获取专属配置。</p><form id="login-form"><label class="field">用户名<input name="username" autocomplete="username" required maxlength="40" placeholder="输入用户名"></label><label class="field">密码<input name="password" type="password" autocomplete="current-password" required maxlength="256" placeholder="输入密码"></label><div class="error" id="login-error" role="alert"></div><button class="button wide" type="submit">登录用户中心 <span aria-hidden="true">↗</span></button></form><p class="login-foot">账户由管理员开通 · 无需配置 API 密钥</p></div></section></main>`
+  root.innerHTML = `<main class="login"><section class="intro">${brand}<div class="orbit"></div><div class="intro-copy"><div class="eyebrow">YOUR NETWORK, SIMPLIFIED</div><h1>连接世界，<br>从这里开始。</h1><p>为你准备好的美国直连网络。<br>下载 pash，登录账户，让连接与配置变得简单。</p></div><footer>pash 用户中心 · 美国直连</footer></section><section class="login-area"><div class="login-form"><div class="mobile-brand">${brand}</div><div class="eyebrow">WELCOME BACK</div><h2>登录你的账户</h2><p class="subtle">管理连接、查看用量，获取专属配置。</p><form id="login-form"><label class="field">用户名<input name="username" autocomplete="username" required maxlength="40" placeholder="输入用户名"></label><label class="field">密码<input name="password" type="password" autocomplete="current-password" required maxlength="256" placeholder="输入密码"></label><div class="error" id="login-error" role="alert"></div><button class="button wide" type="submit">登录用户中心 <span aria-hidden="true">↗</span></button></form><p class="login-foot">账户由管理员开通 · 专属配置与用量统计</p></div></section></main>`
   document.querySelector('#login-form').onsubmit = async (event) => {
     event.preventDefault()
     const form = event.currentTarget,
@@ -144,7 +144,7 @@ function downloads() {
     )}</div><section class="card section"><div class="section-head"><h2>三步，开始连接</h2></div><div class="steps"><div class="step"><div class="step-num">1</div><h3>安装 pash</h3><p>打开 DMG，将 pash 拖入 Applications 文件夹。</p></div><div class="step"><div class="step-num">2</div><h3>登录或一键配置</h3><p>在 pash 的账户页使用同一用户名和密码登录，或点击下方按钮。</p></div><div class="step"><div class="step-num">3</div><h3>直接连接美国</h3><p>个人代理配置会自动启用，之后软件更新会保留配置。</p></div></div><div class="activation"><div><h3>已经安装了 pash？</h3><p>打开软件并导入你的个人配置，自动启用美国直连。</p></div><a class="button" href="${escape(account.activationUrl)}">打开 pash 并配置 ↗</a></div><p class="meta-note">需要 pash 0.1.3 或更新版本。<a href="${escape(account.subscriptionUrl)}">下载个人 YAML 配置</a>也可用于手动导入。</p></section>`
 }
 function security() {
-  return `<section class="card security-form"><div class="section-head"><div><h2>修改登录密码</h2><p>修改后其他设备的登录状态会失效</p></div></div><form id="password-form"><label class="field">当前密码<input name="currentPassword" type="password" autocomplete="current-password" required></label><label class="field">新密码<input name="password" type="password" autocomplete="new-password" minlength="10" required placeholder="至少 10 个字符"></label><label class="field">确认新密码<input name="confirm" type="password" autocomplete="new-password" minlength="10" required></label><div class="error" id="password-error"></div><button class="button" type="submit">保存新密码</button></form></section>`
+  return `<section class="card security-form"><div class="section-head"><div><h2>修改登录密码</h2><p>修改后其他设备的登录状态会失效</p></div></div><form id="password-form"><label class="field">当前密码<input name="currentPassword" type="password" autocomplete="current-password" required></label><label class="field">新密码<input name="password" type="password" autocomplete="new-password" minlength="10" required placeholder="至少 10 个字符"></label><label class="field">确认新密码<input name="confirm" type="password" autocomplete="new-password" minlength="10" required></label><div class="error" id="password-error"></div><button class="button" type="submit">保存新密码</button></form><button class="button light section" data-logout>退出登录</button></section>`
 }
 function render() {
   const admin = account.user.role === 'admin'
@@ -163,7 +163,7 @@ function render() {
   const pages = admin
     ? ['dashboard', 'users', 'downloads', 'security']
     : ['dashboard', 'downloads', 'security']
-  root.innerHTML = `<div class="shell"><aside class="sidebar">${brand}<div class="nav-label">WORKSPACE</div><nav class="nav">${pages.map((name) => `<button class="${page === name ? 'active' : ''}" data-page="${name}">${svg(name)}${labels[name]}</button>`).join('')}</nav><div class="side-bottom"><div class="person"><span class="avatar">${escape(account.user.username[0].toUpperCase())}</span><div>${escape(account.user.username)}<small>${admin ? '管理员' : '个人账户'}</small></div></div><button class="logout" id="logout">退出登录 ↗</button></div></aside><main class="main"><header class="topbar"><div><h1>${titles[page]}</h1><p class="subtle">${admin ? '管理你的用户与美国 VPS 连接' : '你的个人网络与使用情况'}</p></div><span class="status ${account.nodeHealthy ? '' : 'off'}">${account.nodeHealthy ? '美国节点运行正常' : '节点数据暂不可用'}</span></header><div id="content">${page === 'dashboard' ? dashboard() : page === 'users' ? `<section class="card"><div class="section-head"><div><h2>全部账户</h2><p>${overview?.accounts || 0} 个账户 · 新增、停用与重置登录密码</p></div><button class="button small" id="create-user">＋ 新建账户</button></div>${table(overview?.users || [])}</section>` : page === 'downloads' ? downloads() : security()}</div></main></div>`
+  root.innerHTML = `<div class="shell"><aside class="sidebar">${brand}<div class="nav-label">WORKSPACE</div><nav class="nav">${pages.map((name) => `<button class="${page === name ? 'active' : ''}" data-page="${name}">${svg(name)}${labels[name]}</button>`).join('')}</nav><div class="side-bottom"><div class="person"><span class="avatar">${escape(account.user.username[0].toUpperCase())}</span><div>${escape(account.user.username)}<small>${admin ? '管理员' : '个人账户'}</small></div></div><button class="logout" data-logout>退出登录 ↗</button></div></aside><main class="main"><header class="topbar"><div><h1>${titles[page]}</h1><p class="subtle">${admin ? '管理你的用户与美国 VPS 连接' : '你的个人网络与使用情况'}</p></div><span class="status ${account.nodeHealthy ? '' : 'off'}">${account.nodeHealthy ? '美国节点运行正常' : '节点数据暂不可用'}</span></header><div id="content">${page === 'dashboard' ? dashboard() : page === 'users' ? `<section class="card"><div class="section-head"><div><h2>全部账户</h2><p>${overview?.accounts || 0} 个账户 · 新增、停用与重置登录密码</p></div><button class="button small" id="create-user">＋ 新建账户</button></div>${table(overview?.users || [])}</section>` : page === 'downloads' ? downloads() : security()}</div></main></div>`
   wire()
 }
 function modal(html, callback) {
@@ -201,13 +201,13 @@ function wire() {
         render()
       }),
   )
-  const logout = document.querySelector('#logout')
-  if (logout)
-    logout.onclick = async () => {
+  document.querySelectorAll('[data-logout]').forEach((button) => {
+    button.onclick = async () => {
       await api('/api/logout', 'POST', {})
       account = null
       renderLogin()
     }
+  })
   document.querySelector('#create-user')?.addEventListener('click', () => {
     modal(
       '<h2>新建账户</h2><p class="subtle">用户登录后即可下载软件并获取个人配置。</p><form id="new-user"><label class="field">用户名<input name="username" required minlength="3" maxlength="40" pattern="[a-zA-Z0-9_.-]+" placeholder="例如 alice"></label><label class="field">初始密码<input name="password" type="password" minlength="10" autocomplete="new-password" placeholder="留空则自动生成"></label><label class="field">权限<select name="role"><option value="user">普通用户</option><option value="admin">管理员</option></select></label><label class="field">到期日期<input name="expires" type="date"></label><div class="error"></div><div class="modal-actions"><button class="button light" type="button" data-close>取消</button><button class="button" type="submit">创建账户</button></div></form>',
@@ -355,6 +355,7 @@ async function refresh(full = false) {
       const focused = document.activeElement
       if (
         !document.querySelector('.modal-backdrop') &&
+        window.getSelection()?.isCollapsed !== false &&
         (!focused || focused.tagName !== 'INPUT')
       )
         render()

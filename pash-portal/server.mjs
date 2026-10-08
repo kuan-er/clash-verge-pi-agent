@@ -544,7 +544,10 @@ const server = createServer(async (request, response) => {
           'Cache-Control': 'private, no-store',
         })
         if (request.method === 'HEAD') return response.end()
-        createReadStream(path).pipe(response)
+        const stream = createReadStream(path)
+        response.on('close', () => stream.destroy())
+        stream.on('error', () => response.destroy())
+        stream.pipe(response)
         return
       }
       if (url.pathname.startsWith('/api/admin/')) {
