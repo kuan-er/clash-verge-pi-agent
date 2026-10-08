@@ -208,6 +208,7 @@ export const translationKeys = [
   'networkAgent.transit.already',
   'networkAgent.transit.selected',
   'networkAgent.transit.failed',
+  'networkAgent.account',
   'profiles.page.actions.updateAll',
   'profiles.page.actions.viewRuntimeConfig',
   'profiles.page.actions.reactivate',

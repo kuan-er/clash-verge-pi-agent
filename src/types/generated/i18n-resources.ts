@@ -264,6 +264,7 @@ export interface TranslationResources {
       }
     }
     networkAgent: {
+      account: string
       applied: string
       apply: string
       assistant: string

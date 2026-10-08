@@ -285,6 +285,10 @@ pub fn set_pac_available(available: bool) {
     PAC_AVAILABLE.store(available, Ordering::Release);
 }
 
+pub(crate) fn commands_ready() -> bool {
+    COMMANDS_READY.load(Ordering::Acquire)
+}
+
 pub fn set_commands_ready() {
     COMMANDS_READY.store(true, Ordering::Release);
 }

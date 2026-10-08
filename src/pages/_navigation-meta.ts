@@ -1,4 +1,5 @@
 export const navigationItems = {
+  account: { label: 'networkAgent.account', path: '/account' },
   networkAgent: {
     label: 'networkAgent.title',
     path: '/network-agent',

@@ -1,3 +1,9 @@
+## 0.1.3
+
+- Sign in with a pash account to automatically configure and enable the US direct proxy.
+- Open personal pash activation links from the user portal.
+- Download installers, manage accounts, and monitor per-user and VPS traffic in the web portal.
+
 ## 0.1.2
 
 - Configure proxy chains with the network assistant, keep them across subscription updates, and undo changes.

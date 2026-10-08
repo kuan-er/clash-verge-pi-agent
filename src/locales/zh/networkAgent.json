@@ -54,5 +54,6 @@
     "already": "最快中转已选中：{{node}}",
     "selected": "已切换到最快中转：{{node}}",
     "failed": "中转测速失败，请检查网络助手中的诊断结果。"
-  }
+  },
+  "account": "pash 账户"
 }

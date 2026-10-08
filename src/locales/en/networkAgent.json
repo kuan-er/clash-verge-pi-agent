@@ -54,5 +54,6 @@
     "already": "Fastest transit already selected: {{node}}",
     "selected": "Fastest transit selected: {{node}}",
     "failed": "Transit measurement failed. Inspect the AI Network Assistant diagnostics."
-  }
+  },
+  "account": "pash Account"
 }

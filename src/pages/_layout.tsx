@@ -15,6 +15,7 @@ import {
   WindowResizeHandles,
 } from '@/components/layout/window-controller'
 import { useI18n } from '@/hooks/use-i18n'
+import { useProfiles } from '@/hooks/use-profiles'
 import { useVerge } from '@/hooks/use-verge'
 import { useWindowDecorations } from '@/hooks/use-window'
 import { useThemeMode } from '@/services/states'
@@ -45,6 +46,13 @@ const Layout = () => {
   const navCollapsed = verge?.collapse_navbar ?? false
   const { switchLanguage } = useI18n()
   const navigate = useNavigate()
+  const { profiles } = useProfiles()
+  const initialAccountCheckedRef = useRef(false)
+  useEffect(() => {
+    if (!profiles || initialAccountCheckedRef.current) return
+    initialAccountCheckedRef.current = true
+    if (!profiles.current) navigate('/account', { replace: true })
+  }, [profiles, navigate])
   const themeReady = useMemo(() => Boolean(theme), [theme])
   const windowControlsRef = useRef<any>(null)
   const { decorated } = useWindowDecorations()

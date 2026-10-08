@@ -85,6 +85,14 @@ mod app_init {
             let _ = app.deep_link().register_all();
         }
 
+        if let Ok(Some(urls)) = app.deep_link().get_current()
+            && let Some(url) = urls.into_iter().find(|url| url.scheme() == "pash")
+        {
+            AsyncHandler::spawn(move || async move {
+                resolve::resolve_scheme(url.as_ref()).await;
+            });
+        }
+
         app.deep_link().on_open_url(|event| {
             let urls = event.urls();
             AsyncHandler::spawn(move || async move {
@@ -195,6 +203,9 @@ mod app_init {
             cmd::open_devtools,
             cmd::exit_app,
             cmd::get_network_interfaces_info,
+            cmd::portal_login,
+            cmd::portal_account,
+            cmd::portal_logout,
             cmd::get_profiles,
             cmd::enhance_profiles,
             cmd::patch_profiles_config,

@@ -25,6 +25,14 @@ pub(super) async fn resolve_scheme(param: &str) -> Result<()> {
     let link_parsed = Url::parse(param_str)
         .map_err(|e| anyhow::anyhow!("failed to parse deep link: {e:?}, param: {masked_deep_link}"))?;
 
+    if link_parsed.scheme() == "pash" && link_parsed.host_str() == Some("activate") {
+        if let Some((_, url)) = link_parsed.query_pairs().find(|(key, _)| key == "url") {
+            crate::cmd::portal::activate_portal_profile(&url).await?;
+            handle::Handle::notice_message("import_sub_url::ok", "");
+        }
+        return Ok(());
+    }
+
     let Some((url, name)) = extract_subscription_info(&link_parsed) else {
         logging!(
             warn,

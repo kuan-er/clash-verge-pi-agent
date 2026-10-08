@@ -1,0 +1,22 @@
+[Unit]
+Description=pash managed AnyTLS node
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=pash-portal
+Group=pash-portal
+EnvironmentFile=/etc/pash-portal/portal.env
+ExecStart=/opt/pash-portal/pash-node
+Restart=on-failure
+RestartSec=2
+StateDirectory=pash-portal
+StateDirectoryMode=0700
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target
