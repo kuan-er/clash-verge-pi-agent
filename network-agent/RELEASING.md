@@ -1,4 +1,4 @@
-# macOS releases and in-app updates
+# Desktop releases and in-app updates
 
 pash releases use their own app identity, updater public key and GitHub release
 feed. The upstream updater cannot replace this fork. Production app data lives
@@ -59,8 +59,8 @@ secrets. Never regenerate the updater key when adding Apple signing.
    git push origin pash-v0.1.1
    ```
 
-The **pash macOS Release** workflow builds Apple Silicon and Intel packages, bundles
-Node.js, signs update archives, and publishes the release only after both builds
+The **pash Desktop Release** workflow builds Apple Silicon, Intel Mac and Windows
+x86_64 packages, bundles Node.js, signs update artifacts, and publishes only after all builds
 succeed and all assets are uploaded. Its `latest.json` points to immutable
 versioned archives and carries each complete signature. Publishing the release
 makes the update visible to clients; a Git commit alone does not.
@@ -84,3 +84,9 @@ are under `target/<target>/release/bundle`: a `.dmg` for installation and an
 `.app.tar.gz` plus `.sig` for updates. The bundled runtime is fetched from Node's
 official distribution and checked against its SHA-256 manifest. End users do not
 need Node installed.
+
+Windows packages support Windows 10/11 x86_64. The workflow silently installs the
+EXE on its Windows runner, runs the installed Node runtime, checks the assistant
+bundle, and verifies the update signature with the updater's verification library.
+The EXE and its `.sig` are published together with the Mac artifacts; the shared
+update manifest includes `windows-x86_64` and `windows-x86_64-nsis`.

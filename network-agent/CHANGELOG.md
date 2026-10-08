@@ -1,3 +1,8 @@
+## 0.1.4
+
+- Install pash on Windows 10/11 with its bundled network assistant and signed in-app updates.
+- Download the Windows installer from the user portal and activate personal configurations in a running app.
+
 ## 0.1.3
 
 - Sign in with a pash account to automatically configure and enable the US direct proxy.

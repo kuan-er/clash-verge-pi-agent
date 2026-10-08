@@ -48,7 +48,7 @@ Authenticated downloads are read from `downloads/release.json` in the state
 directory. Deploy immutable signed release assets before replacing this file:
 
 ```json
-{"version":"0.1.3","assets":{"aarch64":"pash_0.1.3_aarch64.dmg","x86_64":"pash_0.1.3_x86_64.dmg"}}
+{"version":"0.1.4","assets":{"aarch64":"pash_0.1.4_aarch64.dmg","x86_64":"pash_0.1.4_x86_64.dmg","windows-x86_64":"pash_0.1.4_windows_x86_64-setup.exe"}}
 ```
 
 The client currently embeds the verified public portal origin. A future origin

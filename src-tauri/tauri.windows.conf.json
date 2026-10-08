@@ -3,6 +3,11 @@
   "identifier": "io.github.kuan-er.pash",
   "bundle": {
     "targets": ["nsis"],
+    "externalBin": [
+      "sidecar/verge-mihomo",
+      "sidecar/verge-mihomo-alpha",
+      "sidecar/network-agent-node"
+    ],
     "windows": {
       "certificateThumbprint": null,
       "digestAlgorithm": "sha256",

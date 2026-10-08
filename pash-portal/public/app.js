@@ -134,14 +134,27 @@ function downloads() {
   return `<div class="download-grid">${[
     ['aarch64', 'Apple Silicon', 'M1、M2、M3、M4、M5 等 Apple 芯片'],
     ['x86_64', 'Intel Mac', '采用 Intel 处理器的 Mac'],
+    [
+      'windows-x86_64',
+      'Windows',
+      '采用 Intel 或 AMD 处理器的 64 位电脑',
+      'Windows · X86_64',
+      'Windows 10 / 11（64 位）',
+    ],
   ]
     .map(
-      ([arch, title, detail]) =>
-        `<article class="card download-card"><span class="chip">macOS · ${arch === 'aarch64' ? 'ARM64' : 'X86_64'}</span><h2>${title}</h2><p>适用于${detail}。<br>安装包内置美国服务地址，登录即可自动配置。</p>${release?.assets?.[arch] ? `<a class="button" href="/download/${arch}">下载安装包 ↓</a><p class="meta-note">pash ${escape(release.version)} · macOS 13.5 或更新版本</p>` : '<button class="button" disabled>安装包构建中</button>'}</article>`,
+      ([
+        arch,
+        title,
+        detail,
+        platform = `macOS · ${arch === 'aarch64' ? 'ARM64' : 'X86_64'}`,
+        requirement = 'macOS 13.5 或更新版本',
+      ]) =>
+        `<article class="card download-card"><span class="chip">${platform}</span><h2>${title}</h2><p>适用于${detail}。<br>安装包内置美国服务地址，登录即可自动配置。</p>${release?.assets?.[arch] ? `<a class="button" href="/download/${arch}">下载安装包 ↓</a><p class="meta-note">pash ${escape(release.version)} · ${requirement}</p>` : '<button class="button" disabled>安装包构建中</button>'}</article>`,
     )
     .join(
       '',
-    )}</div><section class="card section"><div class="section-head"><h2>三步，开始连接</h2></div><div class="steps"><div class="step"><div class="step-num">1</div><h3>安装 pash</h3><p>打开 DMG，将 pash 拖入 Applications 文件夹。</p></div><div class="step"><div class="step-num">2</div><h3>登录或一键配置</h3><p>在 pash 的账户页使用同一用户名和密码登录，或点击下方按钮。</p></div><div class="step"><div class="step-num">3</div><h3>直接连接美国</h3><p>个人代理配置会自动启用，之后软件更新会保留配置。</p></div></div><div class="activation"><div><h3>已经安装了 pash？</h3><p>打开软件并导入你的个人配置，自动启用美国直连。</p></div><a class="button" href="${escape(account.activationUrl)}">打开 pash 并配置 ↗</a></div><p class="meta-note">需要 pash 0.1.3 或更新版本。<a href="${escape(account.subscriptionUrl)}">下载个人 YAML 配置</a>也可用于手动导入。</p></section>`
+    )}</div><section class="card section"><div class="section-head"><h2>三步，开始连接</h2></div><div class="steps"><div class="step"><div class="step-num">1</div><h3>安装 pash</h3><p>Mac：打开 DMG，拖入 Applications。Windows：打开 EXE，按提示完成安装。</p></div><div class="step"><div class="step-num">2</div><h3>登录或一键配置</h3><p>在 pash 的账户页使用同一用户名和密码登录，或点击下方按钮。</p></div><div class="step"><div class="step-num">3</div><h3>直接连接美国</h3><p>个人代理配置会自动启用，之后软件更新会保留配置。</p></div></div><div class="activation"><div><h3>已经安装了 pash？</h3><p>打开软件并导入你的个人配置，自动启用美国直连。</p></div><a class="button" href="${escape(account.activationUrl)}">打开 pash 并配置 ↗</a></div><p class="meta-note">需要 pash 0.1.3 或更新版本。<a href="${escape(account.subscriptionUrl)}">下载个人 YAML 配置</a>也可用于手动导入。</p></section>`
 }
 function security() {
   return `<section class="card security-form"><div class="section-head"><div><h2>修改登录密码</h2><p>修改后其他设备的登录状态会失效</p></div></div><form id="password-form"><label class="field">当前密码<input name="currentPassword" type="password" autocomplete="current-password" required></label><label class="field">新密码<input name="password" type="password" autocomplete="new-password" minlength="10" required placeholder="至少 10 个字符"></label><label class="field">确认新密码<input name="confirm" type="password" autocomplete="new-password" minlength="10" required></label><div class="error" id="password-error"></div><button class="button" type="submit">保存新密码</button></form><button class="button light section" data-logout>退出登录</button></section>`

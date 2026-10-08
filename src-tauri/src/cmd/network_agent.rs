@@ -98,11 +98,11 @@ fn agent_node() -> CmdResult<PathBuf> {
     if let Some(path) = std::env::var_os("NETWORK_AGENT_NODE") {
         return Ok(path.into());
     }
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
     {
         let executable = std::env::current_exe().stringify_err()?;
         if let Some(parent) = executable.parent() {
-            let packaged = parent.join("network-agent-node");
+            let packaged = parent.join(format!("network-agent-node{}", std::env::consts::EXE_SUFFIX));
             if packaged.exists() {
                 return Ok(packaged);
             }

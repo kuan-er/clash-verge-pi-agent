@@ -528,9 +528,13 @@ const server = createServer(async (request, response) => {
         const arch = url.pathname.slice('/download/'.length)
         const file = current?.assets?.[arch]
         if (
-          !['aarch64', 'x86_64'].includes(arch) ||
+          !['aarch64', 'x86_64', 'windows-x86_64'].includes(arch) ||
           !file ||
-          !/^[a-zA-Z0-9_.-]+\.dmg$/.test(file)
+          !(
+            arch === 'windows-x86_64'
+              ? /^[a-zA-Z0-9_.-]+-setup\.exe$/
+              : /^[a-zA-Z0-9_.-]+\.dmg$/
+          ).test(file)
         )
           return send(response, 404, { error: '安装包尚未就绪' })
         const path = join(assetDir, file)
@@ -538,7 +542,10 @@ const server = createServer(async (request, response) => {
           return send(response, 503, { error: '安装包暂不可用' })
         audit(user.username, 'download', arch)
         response.writeHead(200, {
-          'Content-Type': 'application/x-apple-diskimage',
+          'Content-Type':
+            arch === 'windows-x86_64'
+              ? 'application/octet-stream'
+              : 'application/x-apple-diskimage',
           'Content-Length': statSync(path).size,
           'Content-Disposition': `attachment; filename="${file}"`,
           'Cache-Control': 'private, no-store',

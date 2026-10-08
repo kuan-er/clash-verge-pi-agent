@@ -1,4 +1,4 @@
-name: pash macOS Release
+name: pash Desktop Release
 
 on:
   push:
@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: pi-macos-release-${{ github.ref }}
+  group: pi-desktop-release-${{ github.ref }}
   cancel-in-progress: false
 
 env:
@@ -18,17 +18,29 @@ env:
   CARGO_PROFILE_RELEASE_DEBUG: 0
   CARGO_PROFILE_RELEASE_SPLIT_DEBUGINFO: 'off'
 
+defaults:
+  run:
+    shell: bash
+
 jobs:
   build:
-    runs-on: macos-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - target: aarch64-apple-darwin
             arch: aarch64
+            os: macos-latest
+            platform: darwin
           - target: x86_64-apple-darwin
             arch: x86_64
+            os: macos-latest
+            platform: darwin
+          - target: x86_64-pc-windows-msvc
+            arch: x86_64
+            os: windows-latest
+            platform: windows
     steps:
       - uses: actions/checkout@v7
         with:
@@ -63,7 +75,7 @@ jobs:
           targets: ${{ matrix.target }}
       - uses: Swatinem/rust-cache@v2
         with:
-          key: pi-macos-${{ matrix.target }}
+          key: pi-${{ matrix.os == 'macos-latest' && 'macos' || 'windows' }}-${{ matrix.target }}
           cache-on-failure: true
       - name: Install dependencies and prepare bundled runtimes
         run: |
@@ -71,7 +83,7 @@ jobs:
           pnpm agent:setup
           pnpm prebuild ${{ matrix.target }}
           pnpm agent:runtime ${{ matrix.target }}
-      - name: Build signed macOS update artifacts
+      - name: Build signed installers and update artifacts
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
@@ -87,10 +99,14 @@ jobs:
           done
           pnpm tauri build --target ${{ matrix.target }} --ci
       - name: Collect architecture-specific artifacts
-        run: node scripts/pi-release-assets.mjs collect target/${{ matrix.target }}/release/bundle pi-release ${{ matrix.arch }}
+        run: node scripts/pi-release-assets.mjs collect target/${{ matrix.target }}/release/bundle pi-release ${{ matrix.arch }} ${{ matrix.platform }}
+      - name: Verify Windows installation and bundled assistant runtime
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: ./scripts/verify-pi-windows.ps1 -ArtifactDirectory pi-release
       - uses: actions/upload-artifact@v7
         with:
-          name: pi-macos-${{ matrix.arch }}
+          name: pi-${{ matrix.platform }}-${{ matrix.arch }}
           path: pi-release/*
           if-no-files-found: error
 
@@ -107,7 +123,7 @@ jobs:
           node-version: '24.21.0'
       - uses: actions/download-artifact@v8
         with:
-          pattern: pi-macos-*
+          pattern: pi-*
           path: pi-release
           merge-multiple: true
       - name: Generate update manifest
@@ -121,5 +137,5 @@ jobs:
           else
             gh release create "$GITHUB_REF_NAME" --verify-tag --draft --title "pash $GITHUB_REF_NAME" --notes-file pi-release/notes.md
           fi
-          gh release upload "$GITHUB_REF_NAME" pi-release/*.dmg pi-release/*.app.tar.gz pi-release/*.sig pi-release/latest.json --clobber
+          gh release upload "$GITHUB_REF_NAME" pi-release/*.dmg pi-release/*.app.tar.gz pi-release/*.exe pi-release/*.sig pi-release/latest.json --clobber
           gh release edit "$GITHUB_REF_NAME" --draft=false --latest
