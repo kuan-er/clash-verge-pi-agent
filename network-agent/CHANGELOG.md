@@ -1,3 +1,10 @@
+## 0.1.2
+
+- Configure proxy chains with the network assistant, keep them across subscription updates, and undo changes.
+- Test transit nodes through an exit server's /204 address and explain missing chain settings.
+- Select and copy reply text while answers stream, and use a compact message composer.
+- Simplify assistant labels and remove the provider notice below the input.
+
 ## 0.1.1
 
 - Use the hosted AI service without configuring a personal API key.

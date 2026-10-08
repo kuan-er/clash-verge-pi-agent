@@ -19,8 +19,8 @@ requests. Controller secrets, subscription URLs and node passwords are excluded
 from the settings snapshot. Diagnostic evidence, including network addresses, is
 sent through the pash VPS to DeepSeek when the hosted assistant is used (directly
 to DeepSeek with a local key). The terminal also supports broader
-commands and user-requested configuration changes; it is not restricted to the
-four app setting previews.
+commands and user-requested configuration changes in addition to dedicated
+app-setting and proxy-chain previews.
 
 ## Run
 
@@ -87,8 +87,24 @@ Pi's `propose_change` tool generates previews for proxy mode, system proxy, TUN
 and IPv6. The app applies
 each preview only when **Apply this change** is clicked, using the existing Clash
 Verge configuration commands. A stale preview is rejected. The inverse is saved
-before applying the change, and **Undo latest Clash setting** restores the most recent
+before applying the change, and **Undo latest change** restores the most recent
 setting when a newer change has not superseded it.
+
+Choose **Configure proxy chain** or describe the transit selector, exit node,
+traffic selector and exit server's `/204` URL. The assistant reads existing names
+and uses `propose_proxy_chain` to show the path and affected traffic group before
+you apply it. The exit must be an inline node in the current profile, and both
+groups must be separate `select` groups. A provider can supply transit nodes;
+provider-only exit nodes are not supported by this preview tool.
+
+Applying a chain sets the exit's `dialer-proxy`, gives the transit selector its
+probe URL with expected status 204, and optionally selects the exit in the
+traffic group. The app saves an independent overlay for that profile, so
+subscription refreshes and restarts keep the chain without rewriting its source
+or credentials. Missing names, proxy cycles and stale previews are rejected.
+Undo restores the previous overlay and traffic selection. The `/204` endpoint
+checks transit connectivity; use an IP check through the complete chain to
+verify the exit.
 
 ## Terminal and conversations
 
@@ -104,8 +120,8 @@ a requested fix may execute commands that change configuration. The prompt tells
 the agent to back up existing files, explain rollback and verify the result.
 Native requests supply `NETWORK_AGENT_BACKUP_DIR` for those backups. Terminal
 commands are not sandboxed, and backup creation is an agent instruction rather
-than an enforced transaction. The dedicated **Undo latest Clash setting** control
-only covers the four app previews; terminal changes need their own rollback
+than an enforced transaction. The dedicated **Undo latest change** control
+covers app-setting and chain previews; terminal changes need their own rollback
 commands. Known DeepSeek keys and common credential formats are redacted from
 terminal results, and the prompt excludes credential-file reads.
 
@@ -124,10 +140,13 @@ as interrupted; it does not resume commands. The current conversation's latest
 24 messages, up to 8,000 characters each, are supplied as context. **Clear
 conversation** clears only the selected conversation. Messages can be selected
 or copied with their clipboard buttons; the composer has copy and paste buttons.
+Selected reply text can be copied with Command+C or Control+C. Streaming pauses
+the selected reply's display until the selection clears, while the task keeps
+receiving and saving its output.
 
 The assistant runs on request rather than as a scheduled background monitor.
 Dedicated previews do not yet cover subscriptions, rules, DNS resolver editing,
-browser extensions, VPN settings or node selections. Terminal access enables
+browser extensions, VPN settings or arbitrary node selections. Terminal access enables
 additional operations but does not provide dedicated integrations for them.
 
 The sidecar is generated with `pnpm agent:build`, and the Tauri development/build
