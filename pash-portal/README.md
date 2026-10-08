@@ -36,6 +36,11 @@ counters exactly once on each snapshot. Its shape matches `users` and
 `ipTrackingStarted` in the node metrics. The node's private `PUT /listen` control
 can move its listener without closing accepted connections, supporting a
 drained handover instead of terminating active proxy sessions.
+Start the portal after the replacement node unit and alias are ready, and verify
+`/portal-health` before recording a handover as complete. The portal has a weak
+dependency on the node so stopping the node does not stop the website. If the
+node is unavailable at startup, the website stays accessible and synchronization
+resumes when the node returns.
 
 The download page includes a selectable macOS quarantine-removal command and
 a copy button. Clicking either Mac download also opens an installation reminder,

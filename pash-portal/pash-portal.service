@@ -1,7 +1,7 @@
 [Unit]
 Description=pash user portal
 After=network-online.target pash-node.service
-Requires=pash-node.service
+Wants=pash-node.service
 
 [Service]
 User=pash-portal

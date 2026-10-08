@@ -250,7 +250,11 @@ async function collect() {
     sampling = false
   }
 }
-await syncUsers()
+try {
+  await syncUsers()
+} catch {
+  console.warn('Managed node unavailable during portal startup')
+}
 await collect()
 const interval = setInterval(collect, 1000)
 interval.unref()
