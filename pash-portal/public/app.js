@@ -210,7 +210,7 @@ function wire() {
   })
   document.querySelector('#create-user')?.addEventListener('click', () => {
     modal(
-      '<h2>新建账户</h2><p class="subtle">用户登录后即可下载软件并获取个人配置。</p><form id="new-user"><label class="field">用户名<input name="username" required minlength="3" maxlength="40" pattern="[a-zA-Z0-9_.-]+" placeholder="例如 alice"></label><label class="field">初始密码<input name="password" type="password" minlength="10" autocomplete="new-password" placeholder="留空则自动生成"></label><label class="field">权限<select name="role"><option value="user">普通用户</option><option value="admin">管理员</option></select></label><label class="field">到期日期<input name="expires" type="date"></label><div class="error"></div><div class="modal-actions"><button class="button light" type="button" data-close>取消</button><button class="button" type="submit">创建账户</button></div></form>',
+      '<h2>新建账户</h2><p class="subtle">用户登录后即可下载软件并获取个人配置。</p><form id="new-user"><label class="field">用户名<input name="username" required minlength="3" maxlength="40" autocomplete="username" pattern="(?:[a-zA-Z0-9_.]|-)+" placeholder="例如 alice"></label><label class="field">初始密码<input name="password" type="password" minlength="10" autocomplete="new-password" placeholder="留空则自动生成"></label><label class="field">权限<select name="role"><option value="user">普通用户</option><option value="admin">管理员</option></select></label><label class="field">到期日期<input name="expires" type="date"></label><div class="error"></div><div class="modal-actions"><button class="button light" type="button" data-close>取消</button><button class="button" type="submit">创建账户</button></div></form>',
       (element) => {
         element.querySelector('form').onsubmit = async (event) => {
           event.preventDefault()
