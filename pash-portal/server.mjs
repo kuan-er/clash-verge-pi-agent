@@ -488,6 +488,7 @@ const server = createServer(async (request, response) => {
         'Content-Disposition': 'attachment; filename="pash-us.yaml"',
         'subscription-userinfo': `upload=${user.upload}; download=${user.download}; total=0; expire=${user.expires_at}`,
         'profile-update-interval': '24',
+        'profile-web-page-url': base.href,
         'profile-title':
           'base64:' +
           Buffer.from('pash 美国 · ' + user.username).toString('base64'),

@@ -3,6 +3,10 @@
 The HTTPS portal provides administrator-created accounts, authenticated macOS
 downloads, personal subscriptions and activation links. pash 0.1.3 can also
 sign in directly and activate its personal profile. Updates retain app data.
+The subscription page also supports AnyTLS-capable Clash/Mihomo clients through
+a personal subscription URL, `clash://install-config` import and YAML download.
+Each method uses the same account credentials and traffic counters. The remote
+subscription advertises a 24-hour refresh interval and the portal homepage.
 
 The managed AnyTLS node uses the upstream `sing-anytls` protocol implementation.
 It listens separately from the existing owner proxy and swaps immutable user

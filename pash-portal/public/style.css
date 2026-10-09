@@ -704,6 +704,38 @@ select:focus-visible {
   color: #7e937a;
   line-height: 1.7;
 }
+.action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.subscription-entry {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 24px;
+}
+.subscription-entry h2 {
+  margin-bottom: 8px;
+}
+.subscription-field {
+  margin-top: 24px;
+  margin-bottom: 20px;
+}
+.subscription-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.subscription-link input {
+  min-width: 0;
+  flex: 1;
+  font-family: monospace;
+}
+.subscription-link .button {
+  flex-shrink: 0;
+}
 .security-form {
   max-width: 420px;
 }
@@ -828,6 +860,11 @@ select:focus-visible {
   }
 }
 @media (max-width: 720px) {
+  .subscription-entry,
+  .subscription-link {
+    flex-direction: column;
+    align-items: stretch;
+  }
   .command-row {
     flex-direction: column;
     align-items: stretch;

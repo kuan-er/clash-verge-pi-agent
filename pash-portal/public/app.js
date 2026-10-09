@@ -10,6 +10,8 @@ const icons = {
     '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2m20 0v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/><circle cx="9" cy="7" r="4"/>',
   downloads:
     '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>',
+  subscriptions:
+    '<path d="M10 13a5 5 0 0 0 7 .1l3-3a5 5 0 0 0-7-7l-2 2M14 11a5 5 0 0 0-7-.1l-3 3a5 5 0 0 0 7 7l2-2"/>',
   security:
     '<path d="M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11Z"/><path d="m9 12 2 2 4-4"/>',
 }
@@ -160,14 +162,14 @@ function chart(samples) {
 }
 function dashboard() {
   if (account.user.role !== 'admin')
-    return `<div class="grid">${metric('我的累计流量', bytes(account.user.total), '上传与下载之和', true)}${metric('累计下载', bytes(account.user.download), '从账户启用开始统计')}${metric('累计上传', bytes(account.user.upload), '从账户启用开始统计')}${metric('在线公网 IP', account.user.onlineIPs.length, '当前已认证的代理来源')}</div>${ipTable(account.user.ipTraffic || [], account.ipTrackingStarted)}<section class="card section"><div class="section-head"><div><h2>你的连接已经准备好</h2><p>美国 VPS 直连 · 个人账户配置</p></div></div><p class="subtle">下载 pash 后，打开软件并使用本账户登录，即可自动配置美国节点。也可以在安装后点击下方按钮。</p><div class="activation"><div><h3>开始使用 pash</h3><p>无需手动填写服务器、端口或代理密码。</p></div><button class="button" data-page="downloads">获取安装包 ↗</button></div></section>`
+    return `<div class="grid">${metric('我的累计流量', bytes(account.user.total), '上传与下载之和', true)}${metric('累计下载', bytes(account.user.download), '从账户启用开始统计')}${metric('累计上传', bytes(account.user.upload), '从账户启用开始统计')}${metric('在线公网 IP', account.user.onlineIPs.length, '当前已认证的代理来源')}</div>${ipTable(account.user.ipTraffic || [], account.ipTrackingStarted)}<section class="card section"><div class="section-head"><div><h2>你的连接已经准备好</h2><p>美国 VPS 直连 · 个人账户配置</p></div></div><p class="subtle">下载 pash 后，打开软件并使用本账户登录，即可自动配置美国节点。也可以在安装后点击下方按钮。</p><div class="activation"><div><h3>开始使用 pash</h3><p>无需手动填写服务器、端口或代理密码。</p></div><div class="action-row"><button class="button" data-page="downloads">获取安装包 ↗</button><button class="button light" data-page="subscriptions">使用 Clash 订阅 ↗</button></div></div></section>`
   const d = overview
   if (!d) return '<div class="empty">正在读取服务器数据…</div>'
   return `<div class="grid">${metric('账户总数', d.accounts, `${d.activeAccounts} 个可用 · ${d.onlineAccounts} 个在线`)}${metric('代理在线公网 IP', d.proxyOnlineIPs, `${Object.values(d.inboundIPs.proxy).reduce((sum, n) => sum + n, 0)} 条连接 · ${d.managedOnlineIPs} 个已认证来源`)}${metric('受管账户累计流量', bytes(d.managedTraffic.total), '上传 + 下载 · 独立凭据统计', true)}${metric('VPS 当前网络速率', rate(d.rates.received + d.rates.sent), '整台服务器网卡收发速率')}</div><div class="traffic-layout section"><section class="card"><div class="section-head"><div><h2>实时流量</h2><p>受管代理 · 每 3 秒刷新</p></div><span class="chip">LIVE</span></div><div class="rate-row"><div><div class="rate-label"><span class="dot down"></span>下载</div><div class="rate-value">${rate(d.rates.download)}</div></div><div><div class="rate-label"><span class="dot"></span>上传</div><div class="rate-value">${rate(d.rates.upload)}</div></div></div>${chart(d.samples)}</section><section class="card"><div class="section-head"><h2>服务器用量</h2></div><div class="details"><div class="detail-row"><span>账户累计下载</span><strong>${bytes(d.managedTraffic.download)}</strong></div><div class="detail-row"><span>账户累计上传</span><strong>${bytes(d.managedTraffic.upload)}</strong></div><div class="detail-row divider"><span>VPS 网卡累计接收</span><strong>${bytes(d.serverNetwork.received)}</strong></div><div class="detail-row"><span>VPS 网卡累计发送</span><strong>${bytes(d.serverNetwork.sent)}</strong></div><div class="detail-row"><span>VPS 网卡合计</span><strong>${bytes(d.serverNetwork.received + d.serverNetwork.sent)}</strong></div></div><p class="meta-note">网卡累计为本次系统启动以来的读数，包含代理、网页、SSH 等流量。账户用量自 ${date(d.monitorStarted)} 起统计，不含旧入口的历史流量。</p></section></div><section class="card section"><div class="section-head"><div><h2>账户概况</h2><p>用量与当前连接来源</p></div><button class="button light small" data-page="users">管理账户 ↗</button></div>${table(d.users, true)}</section>${ipTable(d.ipDetails || [], d.ipTrackingStarted, true)}`
 }
 function downloads() {
   const release = account.release
-  return `<div class="download-grid">${[
+  return `<section class="card subscription-entry"><div><h2>已经有 Clash 客户端？</h2><p class="subtle">支持 AnyTLS 的客户端可以直接导入个人订阅。</p></div><button class="button light" data-page="subscriptions">获取 Clash 订阅 ↗</button></section><div class="download-grid">${[
     ['aarch64', 'Apple Silicon', 'M1、M2、M3、M4、M5 等 Apple 芯片'],
     ['x86_64', 'Intel Mac', '采用 Intel 处理器的 Mac'],
     [
@@ -192,6 +194,11 @@ function downloads() {
       '',
     )}</div><section class="card section"><div class="section-head"><h2>macOS 首次打开</h2><span class="chip">仅 Mac 需要</span></div><p class="subtle">先打开 DMG，把 pash 拖入“应用程序”。如果 macOS 提示“Apple 无法验证 pash”或阻止打开，请打开“终端”，粘贴下面的命令并按回车，再重新打开 pash。</p><div class="command-row"><pre class="install-command"><code id="macos-open-command">${escape(macosOpenCommand)}</code></pre><button class="button light small" id="copy-macos-command">复制命令</button></div><p class="meta-note">请先完成安装，确保 pash 位于 /Applications/pash.app；否则会提示找不到文件。</p></section><section class="card section"><div class="section-head"><h2>三步，开始连接</h2></div><div class="steps"><div class="step"><div class="step-num">1</div><h3>安装 pash</h3><p>Mac：打开 DMG，拖入 Applications。Windows：打开 EXE，按提示完成安装。</p></div><div class="step"><div class="step-num">2</div><h3>登录或一键配置</h3><p>在 pash 的账户页使用同一用户名和密码登录，或点击下方按钮。</p></div><div class="step"><div class="step-num">3</div><h3>直接连接美国</h3><p>个人代理配置会自动启用，之后软件更新会保留配置。</p></div></div><div class="activation"><div><h3>已经安装了 pash？</h3><p>打开软件并导入你的个人配置，自动启用美国直连。</p></div><a class="button" href="${escape(account.activationUrl)}">打开 pash 并配置 ↗</a></div><p class="meta-note">需要 pash 0.1.3 或更新版本。<a href="${escape(account.subscriptionUrl)}">下载个人 YAML 配置</a>也可用于手动导入。</p></section>`
 }
+function subscriptions() {
+  const importURL =
+    'clash://install-config?url=' + encodeURIComponent(account.subscriptionUrl)
+  return `<section class="card subscription-card"><div class="section-head"><div><h2>Clash / Mihomo 订阅</h2><p>使用你已有的客户端，连接美国 VPS</p></div><span class="chip">AnyTLS · 美国直连</span></div><p class="subtle">适用于支持 AnyTLS 的 Clash / Mihomo 客户端，例如新版 Clash Verge Rev。节点、代理凭据和账户用量与 pash 共用，无需手动填写服务器或密码。</p><label class="field subscription-field">个人订阅链接<div class="subscription-link"><input id="subscription-url" type="password" value="${escape(account.subscriptionUrl)}" readonly autocomplete="off" spellcheck="false" aria-label="个人订阅链接"><button class="button light small" id="toggle-subscription" aria-pressed="false">显示链接</button></div></label><div class="action-row"><button class="button" id="copy-subscription">复制订阅链接</button><a class="button light" href="${escape(importURL)}" id="import-clash">一键导入 Clash ↗</a><a class="button light" href="${escape(account.subscriptionUrl)}" id="download-subscription">下载 YAML ↓</a></div><p class="meta-note">订阅链接是你的账户访问凭据，仅供你自己使用。一键导入会打开系统绑定的 Clash 客户端；如未打开，请使用复制链接的方式导入。</p></section><section class="card section"><div class="section-head"><h2>导入后，开始连接</h2></div><div class="steps"><div class="step"><div class="step-num">1</div><h3>添加远程订阅</h3><p>打开客户端的“订阅”或“配置”页面，选择新增订阅，粘贴完整链接并导入。</p></div><div class="step"><div class="step-num">2</div><h3>启用美国节点</h3><p>选中新导入的配置，在代理页选择“美国直连”，并按客户端提示开启系统代理。</p></div><div class="step"><div class="step-num">3</div><h3>更新或查看用量</h3><p>可在客户端开启自动更新，或手动刷新订阅。账户流量会继续显示在用户中心。</p></div></div><p class="meta-note">本地导入：下载 YAML 后，在客户端选择导入配置文件。远程订阅更方便接收后续节点更新；停用或到期的账户无法继续使用代理。</p></section>`
+}
 function security() {
   return `<section class="card security-form"><div class="section-head"><div><h2>修改登录密码</h2><p>修改后其他设备的登录状态会失效</p></div></div><form id="password-form"><label class="field">当前密码<input name="currentPassword" type="password" autocomplete="current-password" required></label><label class="field">新密码<input name="password" type="password" autocomplete="new-password" minlength="10" required placeholder="至少 10 个字符"></label><label class="field">确认新密码<input name="confirm" type="password" autocomplete="new-password" minlength="10" required></label><div class="error" id="password-error"></div><button class="button" type="submit">保存新密码</button></form><button class="button light section" data-logout>退出登录</button></section>`
 }
@@ -202,18 +209,20 @@ function render() {
     dashboard: '连接概览',
     users: '账户管理',
     downloads: '下载 pash',
+    subscriptions: '代理订阅',
     security: '账户安全',
   }
   const labels = {
     dashboard: '概览',
     users: '账户',
     downloads: '下载',
+    subscriptions: '订阅',
     security: '安全',
   }
   const pages = admin
-    ? ['dashboard', 'users', 'downloads', 'security']
-    : ['dashboard', 'downloads', 'security']
-  root.innerHTML = `<div class="shell"><aside class="sidebar">${brand}<div class="nav-label">WORKSPACE</div><nav class="nav">${pages.map((name) => `<button class="${page === name ? 'active' : ''}" data-page="${name}">${svg(name)}${labels[name]}</button>`).join('')}</nav><div class="side-bottom"><div class="person"><span class="avatar">${escape(account.user.username[0].toUpperCase())}</span><div>${escape(account.user.username)}<small>${admin ? '管理员' : '个人账户'}</small></div></div><button class="logout" data-logout>退出登录 ↗</button></div></aside><main class="main"><header class="topbar"><div><h1>${titles[page]}</h1><p class="subtle">${admin ? '管理你的用户与美国 VPS 连接' : '你的个人网络与使用情况'}</p></div><span class="status ${account.nodeHealthy ? '' : 'off'}">${account.nodeHealthy ? '美国节点运行正常' : '节点数据暂不可用'}</span></header><div id="content">${page === 'dashboard' ? dashboard() : page === 'users' ? `<section class="card"><div class="section-head"><div><h2>全部账户</h2><p>${overview?.accounts || 0} 个账户 · 新增、停用与重置登录密码</p></div><button class="button small" id="create-user">＋ 新建账户</button></div>${table(overview?.users || [])}</section>` : page === 'downloads' ? downloads() : security()}</div></main></div>`
+    ? ['dashboard', 'users', 'subscriptions', 'downloads', 'security']
+    : ['dashboard', 'subscriptions', 'downloads', 'security']
+  root.innerHTML = `<div class="shell"><aside class="sidebar">${brand}<div class="nav-label">WORKSPACE</div><nav class="nav">${pages.map((name) => `<button class="${page === name ? 'active' : ''}" data-page="${name}">${svg(name)}${labels[name]}</button>`).join('')}</nav><div class="side-bottom"><div class="person"><span class="avatar">${escape(account.user.username[0].toUpperCase())}</span><div>${escape(account.user.username)}<small>${admin ? '管理员' : '个人账户'}</small></div></div><button class="logout" data-logout>退出登录 ↗</button></div></aside><main class="main"><header class="topbar"><div><h1>${titles[page]}</h1><p class="subtle">${admin ? '管理你的用户与美国 VPS 连接' : '你的个人网络与使用情况'}</p></div><span class="status ${account.nodeHealthy ? '' : 'off'}">${account.nodeHealthy ? '美国节点运行正常' : '节点数据暂不可用'}</span></header><div id="content">${page === 'dashboard' ? dashboard() : page === 'users' ? `<section class="card"><div class="section-head"><div><h2>全部账户</h2><p>${overview?.accounts || 0} 个账户 · 新增、停用与重置登录密码</p></div><button class="button small" id="create-user">＋ 新建账户</button></div>${table(overview?.users || [])}</section>` : page === 'subscriptions' ? subscriptions() : page === 'downloads' ? downloads() : security()}</div></main></div>`
   wire()
   const ipTableElement = document.querySelector('#source-ip-table')
   if (ipTableElement) ipTableElement.scrollLeft = ipScroll
@@ -259,6 +268,32 @@ async function copyMacosCommand(element) {
   }
 }
 function wire() {
+  document
+    .querySelector('#toggle-subscription')
+    ?.addEventListener('click', (event) => {
+      const input = document.querySelector('#subscription-url')
+      const visible = input.type === 'password'
+      input.type = visible ? 'text' : 'password'
+      event.currentTarget.textContent = visible ? '隐藏链接' : '显示链接'
+      event.currentTarget.setAttribute('aria-pressed', String(visible))
+    })
+  document
+    .querySelector('#copy-subscription')
+    ?.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(account.subscriptionUrl)
+        toast('订阅链接已复制，粘贴到客户端的订阅导入页面')
+      } catch {
+        const input = document.querySelector('#subscription-url')
+        input.type = 'text'
+        input.focus()
+        input.select()
+        const toggle = document.querySelector('#toggle-subscription')
+        toggle.textContent = '隐藏链接'
+        toggle.setAttribute('aria-pressed', 'true')
+        toast('已选中链接，请按 ⌘C / Ctrl+C 复制')
+      }
+    })
   document
     .querySelector('#copy-macos-command')
     ?.addEventListener('click', () =>

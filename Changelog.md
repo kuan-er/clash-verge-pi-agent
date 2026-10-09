@@ -25,6 +25,7 @@
 <details>
 <summary><strong> ✨ 新增功能 </strong></summary>
 
+- 新增独立的 Clash/Mihomo 订阅入口，支持复制链接、一键导入和下载 AnyTLS 配置
 - 新增用户中心来源 IP 的归属地、运营商、代理流量和连接明细，保留离线记录
 - 新增 macOS 下载后的首次打开说明与终端命令复制按钮
 
