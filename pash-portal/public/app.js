@@ -52,13 +52,23 @@ function toast(text) {
   setTimeout(() => element.classList.remove('show'), 3200)
 }
 async function api(path, method = 'GET', body) {
-  const response = await fetch(path, {
-    method,
-    credentials: 'same-origin',
-    headers: { 'Content-Type': 'application/json' },
-    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-  })
-  const data = await response.json()
+  let response, data
+  try {
+    response = await fetch(path, {
+      method,
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    })
+    data = await response.json()
+  } catch (error) {
+    if (error instanceof TypeError)
+      throw Object.assign(
+        new Error('无法连接用户中心，请检查网络连接后重试。'),
+        { connectionFailure: true },
+      )
+    throw error
+  }
   if (!response.ok) {
     if (response.status === 401 && account) {
       account = null
@@ -350,7 +360,10 @@ function wire() {
             await refresh(true)
             showCredentials(result.user.username, result.password)
           } catch (error) {
-            element.querySelector('.error').textContent = error.message
+            element.querySelector('.error').textContent =
+              error.connectionFailure
+                ? '连接中断，创建结果尚未确认。请取消后刷新账户列表，检查是否已创建，避免重复提交。'
+                : error.message
             button.disabled = false
           }
         }
