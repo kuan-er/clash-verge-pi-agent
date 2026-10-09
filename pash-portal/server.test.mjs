@@ -3,6 +3,7 @@ import { spawn } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
 import { once } from 'node:events'
 import { mkdtemp, rm } from 'node:fs/promises'
+import { createServer as createHTTPServer } from 'node:http'
 import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -75,10 +76,54 @@ test('portal serves the login page and authenticates while the node is unavailab
     body: JSON.stringify({ username: 'recovery-test', password }),
   })
   assert.equal(login.status, 200)
-  const { sessionToken } = await login.json()
+  const { sessionToken, subscriptionUrl } = await login.json()
   const me = await fetch(base + '/api/me', {
     headers: { Authorization: 'Bearer ' + sessionToken },
   })
   assert.equal(me.status, 200)
   assert.equal((await me.json()).nodeHealthy, false)
+  await t.test(
+    'subscription routes domestic destinations before the US fallback',
+    async (t) => {
+      const node = createHTTPServer((request, response) => {
+        request.resume()
+        response.setHeader('Content-Type', 'application/json')
+        response.end(
+          JSON.stringify({
+            users: {},
+            serverNetwork: { received: 0, sent: 0 },
+          }),
+        )
+      })
+      node.listen(join(state, 'node.sock'))
+      await once(node, 'listening')
+      t.after(() => new Promise((resolve) => node.close(resolve)))
+      for (let attempt = 0; attempt < 50; attempt++) {
+        if ((await fetch(`${base}/portal-health`)).status === 200) break
+        await setTimeout(50)
+      }
+      const url = new URL(subscriptionUrl)
+      const subscription = await fetch(`${base}${url.pathname}${url.search}`)
+      assert.equal(subscription.status, 200)
+      const yaml = await subscription.text()
+      const rules = yaml
+        .split('rules:\n')[1]
+        .trim()
+        .split('\n')
+        .map((line) => line.trim().slice(2))
+      assert.equal(rules.at(-1), 'MATCH,pash 美国')
+      for (const direct of [
+        'PROCESS-NAME,WeChat,DIRECT',
+        'DOMAIN-SUFFIX,qq.com,DIRECT',
+        'GEOSITE,cn,DIRECT',
+        'GEOIP,CN,DIRECT',
+      ]) {
+        assert.ok(
+          rules.slice(0, -1).includes(direct),
+          `Missing domestic route: ${direct}`,
+        )
+      }
+      assert.match(yaml, /skip-cert-verify":false/)
+    },
+  )
 })

@@ -7,6 +7,13 @@ The subscription page also supports AnyTLS-capable Clash/Mihomo clients through
 a personal subscription URL, `clash://install-config` import and YAML download.
 Each method uses the same account credentials and traffic counters. The remote
 subscription advertises a 24-hour refresh interval and the portal homepage.
+In rule mode, WeChat processes and domains, domestic domains from `GEOSITE,cn`
+and Chinese destination IPs from `GEOIP,CN` connect directly. Other traffic uses
+the US node. pash bundles the geodata; other Mihomo clients must have their
+standard geosite and country databases available. Refresh an existing remote
+subscription to receive routing changes. Established connections keep their
+original route until they reconnect. Global mode follows the `GLOBAL` selection
+instead of these routing rules.
 
 The managed AnyTLS node uses the upstream `sing-anytls` protocol implementation.
 It listens separately from the existing owner proxy and swaps immutable user
