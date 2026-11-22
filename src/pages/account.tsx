@@ -93,7 +93,7 @@ export default function AccountPage() {
               ))}
             </Box>
             <Stack direction="row" spacing={1.5} useFlexGap sx={{ flexWrap: 'wrap' }}>
-              <Button variant="contained" startIcon={<OpenInNew />} onClick={() => void openExternalUrl('https://154.40.137.121:8443')}>打开用户中心</Button>
+              <Button variant="contained" startIcon={<OpenInNew />} onClick={() => void openExternalUrl('https://pash.fyi')}>打开用户中心</Button>
               <Button disabled={busy} onClick={async () => {
                 setBusy(true)
                 try { await invoke('portal_logout'); setAccount(null); setConfigured(false) }
@@ -120,7 +120,7 @@ export default function AccountPage() {
               <Button type="submit" variant="contained" size="large" disabled={busy} sx={{ minHeight: 46 }}>
                 {busy ? <><CircularProgress color="inherit" size={18} sx={{ mr: 1 }} />正在登录并应用配置…</> : '登录并启用美国直连'}
               </Button>
-              <Button startIcon={<OpenInNew />} onClick={() => void openExternalUrl('https://154.40.137.121:8443')}>打开用户中心</Button>
+              <Button startIcon={<OpenInNew />} onClick={() => void openExternalUrl('https://pash.fyi')}>打开用户中心</Button>
             </Stack>
           </Paper>
         )}

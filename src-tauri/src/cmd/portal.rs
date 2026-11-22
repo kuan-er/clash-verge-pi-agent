@@ -12,7 +12,7 @@ use std::time::Duration;
 use tauri::Url;
 use tokio::fs;
 
-const PORTAL_URL: &str = "https://154.40.137.121:8443";
+const PORTAL_URL: &str = "https://pash.fyi";
 
 #[derive(Deserialize, Serialize)]
 struct Account {

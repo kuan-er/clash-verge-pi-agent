@@ -189,7 +189,7 @@ pub fn safe_state(config: &Mapping, profile_id: &str, plan: Option<&ChainPlan>) 
                     "type": p.get("type").and_then(Value::as_str),
             "dialerProxy": p.get("dialer-proxy").and_then(Value::as_str),
             "suggestedProbeUrl": if p.get("server").and_then(Value::as_str) == Some("154.40.137.121") {
-                Some("https://154.40.137.121:8443/204")
+                Some("https://pash.fyi/204")
             } else { None },
                 })
         })
@@ -209,7 +209,7 @@ pub fn safe_state(config: &Mapping, profile_id: &str, plan: Option<&ChainPlan>) 
     Ok(json!({
         "version": { "profileId": profile_id, "fingerprint": fingerprint, "plan": plan },
         "nodes": nodes, "groups": groups,
-        "defaultProbeUrl": "https://154.40.137.121:8443/204",
+        "defaultProbeUrl": "https://pash.fyi/204",
     }))
 }
 
