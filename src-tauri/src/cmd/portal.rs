@@ -29,7 +29,9 @@ fn client() -> Result<reqwest::Client> {
 
 fn subscription_url(raw: &str) -> Result<Url> {
     let url = Url::parse(raw)?;
-    if url.origin() != Url::parse(PORTAL_URL)?.origin()
+    let mut portal = Url::parse(PORTAL_URL)?;
+    let legacy = Url::parse("https://154.40.137.121:8443")?;
+    if (url.origin() != portal.origin() && url.origin() != legacy.origin())
         || url.path() != "/subscription.yaml"
         || !url.username().is_empty()
         || url.password().is_some()
@@ -40,7 +42,9 @@ fn subscription_url(raw: &str) -> Result<Url> {
     {
         bail!("Use your personal configuration from the pash user portal.");
     }
-    Ok(url)
+    portal.set_path(url.path());
+    portal.set_query(url.query());
+    Ok(portal)
 }
 
 async fn store_account(token: &str) -> Result<()> {
@@ -137,7 +141,13 @@ pub async fn portal_login(username: String, password: String) -> CmdResult<Value
         .await
         .map_err(|_| coded_error("PORTAL_LOGIN_FAILED", "无法连接用户平台，请检查网络后重试"))?;
     if !response.status().is_success() {
-        return Err(coded_error("PORTAL_LOGIN_FAILED", "登录失败，请检查密码和账户状态"));
+        let message = match response.status() {
+            reqwest::StatusCode::UNAUTHORIZED => "登录失败，请检查密码和账户状态",
+            reqwest::StatusCode::FORBIDDEN => "登录被拒绝，请到用户中心检查套餐状态",
+            reqwest::StatusCode::TOO_MANY_REQUESTS => "登录请求过于频繁，请稍后重试",
+            _ => "用户平台暂时无法处理登录请求，请稍后重试",
+        };
+        return Err(coded_error("PORTAL_LOGIN_FAILED", message));
     }
     let data: Value = response
         .json()
